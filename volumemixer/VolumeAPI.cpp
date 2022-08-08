@@ -13,15 +13,6 @@
     x = NULL;                                                                                                          \
   }
 
-#define CHECK_HR_RET()                                                                                                 \
-  if (FAILED(hr)) {                                                                                                    \
-    return;                                                                                                            \
-  }
-#define CHECK_HR_BREAK()                                                                                               \
-  if (FAILED(hr)) {                                                                                                    \
-    return;                                                                                                            \
-  }
-
 
 bool wrapped_call(HRESULT hr) {
   return not FAILED(hr);
@@ -210,4 +201,51 @@ std::vector<int> VolumeControl::get_all_pid() {
   session_enumerate(cb);
 
   return ret;
+}
+
+std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_info() {
+
+  std::vector<AudioSessionInfo> ret;
+
+  auto cb = [&ret](IAudioSessionControl* ctrl, IAudioSessionControl2* ctrl2, DWORD pid) {
+
+    AudioSessionInfo info{};
+    info.pid_ = pid;
+    ISimpleAudioVolume* volume;
+    if (wrapped_call(ctrl2->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&volume))) {
+      float vol = 0;
+      volume->GetMasterVolume(&vol);
+      info.volume_ = vol * 100.0f;
+      BOOL b;
+      volume->GetMute(&b);
+      info.muted_ = b;
+      SAFE_RELEASE(volume);
+    }
+
+    LPWSTR str;
+    ctrl->GetDisplayName(&str);
+    info.display_name_ = std::wstring(str);
+    CoTaskMemFree(str);
+
+    ctrl->GetIconPath(&str);
+    info.icon_path_ = std::wstring(str);
+    CoTaskMemFree(str);
+    ret.push_back(info);
+    return false;
+  };
+
+  session_enumerate(cb);
+  return ret;
+}
+
+VolumeControl::AudioSessionInfo VolumeControl::get_master_info() {
+
+  AudioSessionInfo info;
+  info.pid_ = -1;
+  info.display_name_ = L"Master";
+  info.volume_ = get_master_volume();
+  info.muted_ = get_master_mute();
+
+  return info;
+
 }

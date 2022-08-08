@@ -9,14 +9,14 @@ int main() {
   if (not init()) {
     return 1;
   }
+  
+  const auto ret = get_all_sessions_info();
 
-  const auto pid = get_all_pid();
-
-  for (auto p : pid) {
-    std::cout << "PID: " << p << "\t Volume: " << get_app_volume(p) << '\n';
+  for (auto i : ret) {
+    std::wcout << i << '\n';
   }
 
-  std::cout << "Master: " << get_master_volume() << '\n';
+  std::wcout << get_master_info() << '\n';
 
   return 0;
 } 
