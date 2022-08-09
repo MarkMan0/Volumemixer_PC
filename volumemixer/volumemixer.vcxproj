@@ -135,9 +135,6 @@
     <ClCompile Include="VolumeAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".clang-format" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="VolumeAPI.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

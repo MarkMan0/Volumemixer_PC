@@ -24,7 +24,7 @@ namespace VolumeControl {
 
 
   struct AudioSessionInfo {
-    std::wstring display_name_;
+    std::wstring path_;
     std::wstring icon_path_;
     int pid_;
     float volume_;
@@ -37,8 +37,16 @@ namespace VolumeControl {
 
 
 inline std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionInfo& audio) {
-  out << audio.display_name_ << std::wstring(L"\n\tvolume: ") << std::to_wstring(audio.volume_) << std::wstring( L"\n\tmuted: ") << std::to_wstring(audio.muted_)
+  out << audio.path_ << std::wstring(L"\n\tvolume: ") << std::to_wstring(audio.volume_) << std::wstring( L"\n\tmuted: ") << std::to_wstring(audio.muted_)
       << std::wstring(L"\n\ticon: ") << audio.icon_path_ << std::wstring(L"\n\tPID: ") << std::to_wstring(audio.pid_);
 
   return out;
 }
+
+
+namespace ProcessAPI {
+
+  std::wstring get_path_from_pid(int pid);
+  std::vector<std::wstring> get_icon_from_pid(int pid);
+
+};

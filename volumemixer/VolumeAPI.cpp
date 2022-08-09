@@ -4,6 +4,9 @@
 #include <mmdeviceapi.h>
 #include <audiopolicy.h>
 #include <endpointvolume.h>
+#include <Psapi.h>
+#include <array>
+#include <fstream>
 
 // Based on: https://github.com/chrispader/VolumeControl
 
@@ -13,6 +16,144 @@
     x = NULL;                                                                                                          \
   }
 
+
+#include <Windows.h>
+#include <shellapi.h>
+
+struct ICONDIRENTRY {
+  UCHAR nWidth;
+  UCHAR nHeight;
+  UCHAR nNumColorsInPalette;  // 0 if no palette
+  UCHAR nReserved;            // should be 0
+  WORD nNumColorPlanes;       // 0 or 1
+  WORD nBitsPerPixel;
+  ULONG nDataLength;  // length in bytes
+  ULONG nOffset;      // offset of BMP or PNG data from beginning of file
+};
+
+#define WRITE_ICO_TO_FILE
+bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff, std::wstring filename) {
+  if (offsetof(ICONDIRENTRY, nOffset) != 12) {
+    return false;
+  }
+
+  HDC dc = CreateCompatibleDC(NULL);
+
+#ifdef WRITE_ICO_TO_FILE
+  std::ofstream file;
+  file.open(filename, std::ios_base::out | std::ios_base::binary);
+  if (not file.is_open()) {
+    return false;
+  }
+#endif
+
+  // Write header:
+  char icoHeader[6] = { 0, 0, 1, 0, 1, 0 };  // ICO file with 1 image
+#ifdef WRITE_ICO_TO_FILE
+  file.write(icoHeader, sizeof(icoHeader));
+#endif
+  buff.insert(buff.end(), reinterpret_cast<const char*>(icoHeader),
+              reinterpret_cast<const char*>(icoHeader) + sizeof(icoHeader));
+
+  // Get information about icon:
+  ICONINFO iconInfo;
+  GetIconInfo(hIcon, &iconInfo);
+  BITMAPINFO bmInfo = { 0 };
+  bmInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  bmInfo.bmiHeader.biBitCount = 0;  // don't get the color table
+  if (!GetDIBits(dc, iconInfo.hbmColor, 0, 0, NULL, &bmInfo, DIB_RGB_COLORS)) {
+    return false;
+  }
+
+  // Allocate size of bitmap info header plus space for color table:
+  int nBmInfoSize = sizeof(BITMAPINFOHEADER);
+  if (nColorBits < 24) {
+    nBmInfoSize += sizeof(RGBQUAD) * (int)(1 << nColorBits);
+  }
+
+  std::vector<UCHAR> bitmapInfo;
+  bitmapInfo.resize(nBmInfoSize);
+  BITMAPINFO* pBmInfo = (BITMAPINFO*)bitmapInfo.data();
+  memcpy(pBmInfo, &bmInfo, sizeof(BITMAPINFOHEADER));
+
+  // Get bitmap data:
+  if (!bmInfo.bmiHeader.biSizeImage) return false;
+  std::vector<UCHAR> bits;
+  bits.resize(bmInfo.bmiHeader.biSizeImage);
+  pBmInfo->bmiHeader.biBitCount = nColorBits;
+  pBmInfo->bmiHeader.biCompression = BI_RGB;
+  if (!GetDIBits(dc, iconInfo.hbmColor, 0, bmInfo.bmiHeader.biHeight, bits.data(), pBmInfo, DIB_RGB_COLORS)) {
+    return false;
+  }
+
+  // Get mask data:
+  BITMAPINFO maskInfo = { 0 };
+  maskInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  maskInfo.bmiHeader.biBitCount = 0;  // don't get the color table
+  if (!GetDIBits(dc, iconInfo.hbmMask, 0, 0, NULL, &maskInfo, DIB_RGB_COLORS) || maskInfo.bmiHeader.biBitCount != 1)
+    return false;
+
+  std::vector<UCHAR> maskBits;
+  maskBits.resize(maskInfo.bmiHeader.biSizeImage);
+  std::vector<UCHAR> maskInfoBytes;
+  maskInfoBytes.resize(sizeof(BITMAPINFO) + 2 * sizeof(RGBQUAD));
+  BITMAPINFO* pMaskInfo = (BITMAPINFO*)maskInfoBytes.data();
+  memcpy(pMaskInfo, &maskInfo, sizeof(maskInfo));
+  if (!GetDIBits(dc, iconInfo.hbmMask, 0, maskInfo.bmiHeader.biHeight, maskBits.data(), pMaskInfo, DIB_RGB_COLORS)) {
+    return false;
+  }
+
+  // Write directory entry:
+  ICONDIRENTRY dir;
+  dir.nWidth = (UCHAR)pBmInfo->bmiHeader.biWidth;
+  dir.nHeight = (UCHAR)pBmInfo->bmiHeader.biHeight;
+  dir.nNumColorsInPalette = (nColorBits == 4 ? 16 : 0);
+  dir.nReserved = 0;
+  dir.nNumColorPlanes = 0;
+  dir.nBitsPerPixel = pBmInfo->bmiHeader.biBitCount;
+  dir.nDataLength = pBmInfo->bmiHeader.biSizeImage + pMaskInfo->bmiHeader.biSizeImage + nBmInfoSize;
+  dir.nOffset = sizeof(dir) + sizeof(icoHeader);
+#ifdef WRITE_ICO_TO_FILE
+  file.write(reinterpret_cast<char*>(&dir), sizeof(dir));
+#endif
+  buff.insert(buff.end(), reinterpret_cast<const char*>(&dir), reinterpret_cast<const char*>(&dir) + sizeof(dir));
+
+  // Write DIB header (including color table):
+  int nBitsSize = pBmInfo->bmiHeader.biSizeImage;
+  pBmInfo->bmiHeader.biHeight *= 2;  // because the header is for both image and mask
+  pBmInfo->bmiHeader.biCompression = 0;
+  pBmInfo->bmiHeader.biSizeImage += pMaskInfo->bmiHeader.biSizeImage;  // because the header is for both image and mask
+#ifdef WRITE_ICO_TO_FILE
+  file.write(reinterpret_cast<char*>(&pBmInfo->bmiHeader), nBmInfoSize);
+#endif
+  buff.insert(buff.end(), reinterpret_cast<const char*>(&pBmInfo->bmiHeader),
+              reinterpret_cast<const char*>(&pBmInfo->bmiHeader) + nBmInfoSize);
+
+  // Write image data:
+#ifdef WRITE_ICO_TO_FILE
+  file.write((char*)bits.data(), nBitsSize);
+#endif
+  buff.insert(buff.end(), reinterpret_cast<const char*>(bits.data()),
+              reinterpret_cast<const char*>(bits.data()) + nBitsSize);
+
+  // Write mask data:
+#ifdef WRITE_ICO_TO_FILE
+  file.write((char*)maskBits.data(), pMaskInfo->bmiHeader.biSizeImage);
+#endif
+  buff.insert(buff.end(), reinterpret_cast<const char*>(maskBits.data()),
+              reinterpret_cast<const char*>(maskBits.data()) + pMaskInfo->bmiHeader.biSizeImage);
+
+#ifdef WRITE_ICO_TO_FILE
+  file.close();
+#endif
+
+  DeleteObject(iconInfo.hbmColor);
+  DeleteObject(iconInfo.hbmMask);
+
+  DeleteDC(dc);
+
+  return true;
+}
 
 bool wrapped_call(HRESULT hr) {
   return not FAILED(hr);
@@ -204,11 +345,9 @@ std::vector<int> VolumeControl::get_all_pid() {
 }
 
 std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_info() {
-
   std::vector<AudioSessionInfo> ret;
 
   auto cb = [&ret](IAudioSessionControl* ctrl, IAudioSessionControl2* ctrl2, DWORD pid) {
-
     AudioSessionInfo info{};
     info.pid_ = pid;
     ISimpleAudioVolume* volume;
@@ -222,14 +361,9 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
       SAFE_RELEASE(volume);
     }
 
-    LPWSTR str;
-    ctrl->GetDisplayName(&str);
-    info.display_name_ = std::wstring(str);
-    CoTaskMemFree(str);
+    info.path_ = ProcessAPI::get_path_from_pid(pid);
 
-    ctrl->GetIconPath(&str);
-    info.icon_path_ = std::wstring(str);
-    CoTaskMemFree(str);
+    ProcessAPI::get_icon_from_pid(pid);
     ret.push_back(info);
     return false;
   };
@@ -239,13 +373,52 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
 }
 
 VolumeControl::AudioSessionInfo VolumeControl::get_master_info() {
-
   AudioSessionInfo info;
   info.pid_ = -1;
-  info.display_name_ = L"Master";
+  info.path_ = L"Master";
   info.volume_ = get_master_volume();
   info.muted_ = get_master_mute();
 
   return info;
+}
 
+
+std::wstring ProcessAPI::get_path_from_pid(int pid) {
+  HANDLE process_handle = NULL;
+  TCHAR path[MAX_PATH];
+  // PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
+  process_handle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+
+  if (process_handle == NULL) {
+    return {};
+  }
+
+  if (GetModuleFileNameEx(process_handle, NULL, path, MAX_PATH)) {
+    CloseHandle(process_handle);
+    return std::wstring(path);
+  }
+  CloseHandle(process_handle);
+  return {};
+}
+
+
+std::vector<std::wstring> ProcessAPI::get_icon_from_pid(int pid) {
+  static int cnt = 0;
+  std::wstring path = get_path_from_pid(pid);
+
+  UINT num_icons = ExtractIconEx(path.c_str(), -1, NULL, NULL, 0);
+
+  std::vector<std::wstring> ret;
+  HICON ismall{}, ilarge{};
+
+  if (num_icons) {
+    ExtractIconEx(path.c_str(), 0, &ilarge, &ismall, 1);
+    std::vector<char> out;
+    GetIconData(ilarge, 32, out, L"./" + std::to_wstring(cnt++) + L".ico");
+  
+  }
+
+
+
+  return {};
 }
