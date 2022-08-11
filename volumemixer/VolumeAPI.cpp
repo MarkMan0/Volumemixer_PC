@@ -348,16 +348,19 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
       SAFE_RELEASE(volume);
     }
 
-    info.path_ = ProcessAPI::get_path_from_pid(pid);
-
-    info.filename_ = fs::path(info.path_).filename().stem().wstring();
-
-    info.icon_data_ = ProcessAPI::get_icon_from_pid(pid);
+    if (pid == 0) {
+      info.filename_ = L"System";
+    } else {
+      info.path_ = ProcessAPI::get_path_from_pid(pid);
+      info.filename_ = fs::path(info.path_).filename().stem().wstring();
+      info.icon_data_ = ProcessAPI::get_icon_from_pid(pid);
+    }
     ret.push_back(info);
     return false;
   };
 
   session_enumerate(cb);
+  ret.push_back(get_master_info());
   return ret;
 }
 
