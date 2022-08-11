@@ -2,27 +2,77 @@
 #include "VolumeAPI.h"
 #include <fstream>
 #include <string>
+#include <optional>
 
+
+
+static void print_help();
+
+static void flush_cin() {
+  std::cin.clear();
+  std::cin.ignore(10000, '\n');
+}
 
 int main() {
-  using namespace VolumeControl;
-
-  if (not init()) {
+  if (not VolumeControl::init()) {
     return 1;
   }
 
-  const auto ret = get_all_sessions_info();
+  bool running = true;
+  std::optional<int> selected;
 
-  int cnt = 0;
-  for (auto i : ret) {
-    std::wcout << i << '\n';
-    if (i.icon_data_.size()) {
-      std::ofstream file(L"./" + std::to_wstring(cnt++) + L".ico", std::ios::out | std::ios::binary);
-      file.write(i.icon_data_.data(), i.icon_data_.size());
+  while (running) {
+    auto info = VolumeControl::get_all_sessions_info();
+
+    for (const auto& i : info) {
+      std::wcout << i << '\n';
+    }
+
+    char c = std::getchar();
+
+    switch (c) {
+      case 'q':
+        running = false;
+        break;
+
+      case 'h':
+        print_help();
+        break;
+
+      case 's': {
+        int pid;
+        std::cin >> pid;
+        selected = std::nullopt;
+        for (const auto& i : info) {
+          if (i.pid_ == pid) {
+            selected = pid;
+            break;
+          }
+        }
+      } break;
+
+      case '+':
+        if (selected) {
+          int vol = VolumeControl::get_app_volume(*selected);
+          VolumeControl::set_app_volume(*selected, vol + 5);
+        }
+        break;
+
+      case '-':
+        if (selected) {
+          int vol = VolumeControl::get_app_volume(*selected);
+          VolumeControl::set_app_volume(*selected, vol - 5);
+        }
+        break;
     }
   }
 
-  std::wcout << get_master_info() << '\n';
 
   return 0;
+}
+
+
+
+void print_help() {
+  std::cout << "q: Quit\ns<pid>: select audio\n+: increase volume\n-: decrease volume\nh: print help\n";
 }
