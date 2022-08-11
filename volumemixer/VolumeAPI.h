@@ -37,14 +37,7 @@ namespace VolumeControl {
 };  // namespace VolumeControl
 
 
-inline std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionInfo& audio) {
-  out << audio.filename_ << std::wstring(L"\n\tpath: ") << audio.path_ << std::wstring(L"\n\tvolume: ")
-      << std::to_wstring(audio.volume_) << std::wstring(L"\n\tmuted: ") << std::to_wstring(audio.muted_)
-      << std::wstring(L"\n\ticon: ") << audio.icon_data_.size() << std::wstring(L"\n\tPID: ")
-      << std::to_wstring(audio.pid_);
-
-  return out;
-}
+std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionInfo& audio);
 
 
 namespace ProcessAPI {

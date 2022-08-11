@@ -20,6 +20,15 @@ namespace fs = std::filesystem;
   }
 
 
+std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionInfo& audio) {
+  out << audio.filename_ << std::wstring(L"\n\tpath: ") << audio.path_ << std::wstring(L"\n\tvolume: ")
+      << std::to_wstring(audio.volume_) << std::wstring(L"\n\tmuted: ") << std::to_wstring(audio.muted_)
+      << std::wstring(L"\n\ticon: ") << audio.icon_data_.size() << std::wstring(L"\n\tPID: ")
+      << std::to_wstring(audio.pid_);
+
+  return out;
+}
+
 
 struct ICONDIRENTRY {
   UCHAR nWidth;
@@ -384,7 +393,6 @@ std::wstring ProcessAPI::get_path_from_pid(int pid) {
 
 
 std::vector<char> ProcessAPI::get_icon_from_pid(int pid) {
-
   std::wstring path = get_path_from_pid(pid);
 
   UINT num_icons = ExtractIconEx(path.c_str(), -1, NULL, NULL, 0);
