@@ -23,7 +23,7 @@ namespace fs = std::filesystem;
 std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionInfo& audio) {
   out << audio.filename_ << std::wstring(L"\n\tpath: ") << audio.path_ << std::wstring(L"\n\tvolume: ")
       << std::to_wstring(audio.volume_) << std::wstring(L"\n\tmuted: ") << std::to_wstring(audio.muted_)
-      << std::wstring(L"\n\ticon: ") << audio.icon_data_.size() << std::wstring(L"\n\tPID: ")
+      << std::wstring(L"\n\ticon: ") << audio.get_icon_data().size() << std::wstring(L"\n\tPID: ")
       << std::to_wstring(audio.pid_);
 
   return out;
@@ -353,7 +353,6 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
     } else {
       info.path_ = ProcessAPI::get_path_from_pid(pid);
       info.filename_ = fs::path(info.path_).filename().stem().wstring();
-      info.icon_data_ = ProcessAPI::get_icon_from_pid(pid);
     }
     ret.push_back(info);
     return false;
@@ -373,6 +372,10 @@ VolumeControl::AudioSessionInfo VolumeControl::get_master_info() {
   info.muted_ = get_master_mute();
 
   return info;
+}
+
+std::vector<char> VolumeControl::AudioSessionInfo::get_icon_data() const {
+  return ProcessAPI::get_icon_from_pid(pid_);
 }
 
 

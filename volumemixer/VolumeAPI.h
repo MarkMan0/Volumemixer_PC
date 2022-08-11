@@ -29,7 +29,7 @@ namespace VolumeControl {
     int pid_;
     float volume_;
     bool muted_;
-    std::vector<char> icon_data_;
+    std::vector<char> get_icon_data() const;
   };
 
   [[nodiscard]] std::vector<AudioSessionInfo> get_all_sessions_info();
