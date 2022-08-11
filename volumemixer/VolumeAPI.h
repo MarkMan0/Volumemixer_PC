@@ -25,10 +25,11 @@ namespace VolumeControl {
 
   struct AudioSessionInfo {
     std::wstring path_;
-    std::wstring icon_path_;
+    std::wstring filename_;
     int pid_;
     float volume_;
     bool muted_;
+    std::vector<char> icon_data_;
   };
 
   [[nodiscard]] std::vector<AudioSessionInfo> get_all_sessions_info();
@@ -37,8 +38,10 @@ namespace VolumeControl {
 
 
 inline std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionInfo& audio) {
-  out << audio.path_ << std::wstring(L"\n\tvolume: ") << std::to_wstring(audio.volume_) << std::wstring( L"\n\tmuted: ") << std::to_wstring(audio.muted_)
-      << std::wstring(L"\n\ticon: ") << audio.icon_path_ << std::wstring(L"\n\tPID: ") << std::to_wstring(audio.pid_);
+  out << audio.filename_ << std::wstring(L"\n\tpath: ") << audio.path_ << std::wstring(L"\n\tvolume: ")
+      << std::to_wstring(audio.volume_) << std::wstring(L"\n\tmuted: ") << std::to_wstring(audio.muted_)
+      << std::wstring(L"\n\ticon: ") << audio.icon_data_.size() << std::wstring(L"\n\tPID: ")
+      << std::to_wstring(audio.pid_);
 
   return out;
 }
@@ -46,7 +49,7 @@ inline std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioS
 
 namespace ProcessAPI {
 
-  std::wstring get_path_from_pid(int pid);
-  std::vector<std::wstring> get_icon_from_pid(int pid);
+  [[nodiscard]] std::wstring get_path_from_pid(int pid);
+  [[nodiscard]] std::vector<char> get_icon_from_pid(int pid);
 
-};
+};  // namespace ProcessAPI

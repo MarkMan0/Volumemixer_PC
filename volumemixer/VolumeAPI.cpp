@@ -5,8 +5,11 @@
 #include <audiopolicy.h>
 #include <endpointvolume.h>
 #include <Psapi.h>
-#include <array>
-#include <fstream>
+#include <filesystem>
+#include <Windows.h>
+#include <shellapi.h>
+
+namespace fs = std::filesystem;
 
 // Based on: https://github.com/chrispader/VolumeControl
 
@@ -17,8 +20,6 @@
   }
 
 
-#include <Windows.h>
-#include <shellapi.h>
 
 struct ICONDIRENTRY {
   UCHAR nWidth;
@@ -31,27 +32,17 @@ struct ICONDIRENTRY {
   ULONG nOffset;      // offset of BMP or PNG data from beginning of file
 };
 
-#define WRITE_ICO_TO_FILE
-bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff, std::wstring filename) {
+
+bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff) {
   if (offsetof(ICONDIRENTRY, nOffset) != 12) {
     return false;
   }
 
   HDC dc = CreateCompatibleDC(NULL);
 
-#ifdef WRITE_ICO_TO_FILE
-  std::ofstream file;
-  file.open(filename, std::ios_base::out | std::ios_base::binary);
-  if (not file.is_open()) {
-    return false;
-  }
-#endif
 
   // Write header:
   char icoHeader[6] = { 0, 0, 1, 0, 1, 0 };  // ICO file with 1 image
-#ifdef WRITE_ICO_TO_FILE
-  file.write(icoHeader, sizeof(icoHeader));
-#endif
   buff.insert(buff.end(), reinterpret_cast<const char*>(icoHeader),
               reinterpret_cast<const char*>(icoHeader) + sizeof(icoHeader));
 
@@ -113,9 +104,7 @@ bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff, std::wstr
   dir.nBitsPerPixel = pBmInfo->bmiHeader.biBitCount;
   dir.nDataLength = pBmInfo->bmiHeader.biSizeImage + pMaskInfo->bmiHeader.biSizeImage + nBmInfoSize;
   dir.nOffset = sizeof(dir) + sizeof(icoHeader);
-#ifdef WRITE_ICO_TO_FILE
-  file.write(reinterpret_cast<char*>(&dir), sizeof(dir));
-#endif
+
   buff.insert(buff.end(), reinterpret_cast<const char*>(&dir), reinterpret_cast<const char*>(&dir) + sizeof(dir));
 
   // Write DIB header (including color table):
@@ -123,29 +112,18 @@ bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff, std::wstr
   pBmInfo->bmiHeader.biHeight *= 2;  // because the header is for both image and mask
   pBmInfo->bmiHeader.biCompression = 0;
   pBmInfo->bmiHeader.biSizeImage += pMaskInfo->bmiHeader.biSizeImage;  // because the header is for both image and mask
-#ifdef WRITE_ICO_TO_FILE
-  file.write(reinterpret_cast<char*>(&pBmInfo->bmiHeader), nBmInfoSize);
-#endif
+
   buff.insert(buff.end(), reinterpret_cast<const char*>(&pBmInfo->bmiHeader),
               reinterpret_cast<const char*>(&pBmInfo->bmiHeader) + nBmInfoSize);
 
   // Write image data:
-#ifdef WRITE_ICO_TO_FILE
-  file.write((char*)bits.data(), nBitsSize);
-#endif
   buff.insert(buff.end(), reinterpret_cast<const char*>(bits.data()),
               reinterpret_cast<const char*>(bits.data()) + nBitsSize);
 
   // Write mask data:
-#ifdef WRITE_ICO_TO_FILE
-  file.write((char*)maskBits.data(), pMaskInfo->bmiHeader.biSizeImage);
-#endif
   buff.insert(buff.end(), reinterpret_cast<const char*>(maskBits.data()),
               reinterpret_cast<const char*>(maskBits.data()) + pMaskInfo->bmiHeader.biSizeImage);
 
-#ifdef WRITE_ICO_TO_FILE
-  file.close();
-#endif
 
   DeleteObject(iconInfo.hbmColor);
   DeleteObject(iconInfo.hbmMask);
@@ -363,7 +341,9 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
 
     info.path_ = ProcessAPI::get_path_from_pid(pid);
 
-    ProcessAPI::get_icon_from_pid(pid);
+    info.filename_ = fs::path(info.path_).filename().stem().wstring();
+
+    info.icon_data_ = ProcessAPI::get_icon_from_pid(pid);
     ret.push_back(info);
     return false;
   };
@@ -374,8 +354,9 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
 
 VolumeControl::AudioSessionInfo VolumeControl::get_master_info() {
   AudioSessionInfo info;
+  info.filename_ = L"Master";
   info.pid_ = -1;
-  info.path_ = L"Master";
+  ;
   info.volume_ = get_master_volume();
   info.muted_ = get_master_mute();
 
@@ -402,23 +383,19 @@ std::wstring ProcessAPI::get_path_from_pid(int pid) {
 }
 
 
-std::vector<std::wstring> ProcessAPI::get_icon_from_pid(int pid) {
-  static int cnt = 0;
+std::vector<char> ProcessAPI::get_icon_from_pid(int pid) {
+
   std::wstring path = get_path_from_pid(pid);
 
   UINT num_icons = ExtractIconEx(path.c_str(), -1, NULL, NULL, 0);
 
-  std::vector<std::wstring> ret;
-  HICON ismall{}, ilarge{};
-
+  std::vector<char> out;
   if (num_icons) {
-    ExtractIconEx(path.c_str(), 0, &ilarge, &ismall, 1);
-    std::vector<char> out;
-    GetIconData(ilarge, 32, out, L"./" + std::to_wstring(cnt++) + L".ico");
-  
+    HICON ilarge{};
+    ExtractIconEx(path.c_str(), 0, &ilarge, NULL, 1);
+    GetIconData(ilarge, 32, out);
+    DestroyIcon(ilarge);
   }
 
-
-
-  return {};
+  return out;
 }
