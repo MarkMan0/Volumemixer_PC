@@ -54,15 +54,15 @@ int main() {
 
       case '+':
         if (selected) {
-          int vol = VolumeControl::get_app_volume(*selected);
-          VolumeControl::set_app_volume(*selected, vol + 5);
+          int vol = VolumeControl::get_volume(*selected);
+          VolumeControl::set_volume(*selected, vol + 5);
         }
         break;
 
       case '-':
         if (selected) {
-          int vol = VolumeControl::get_app_volume(*selected);
-          VolumeControl::set_app_volume(*selected, vol - 5);
+          int vol = VolumeControl::get_volume(*selected);
+          VolumeControl::set_volume(*selected, vol - 5);
         }
         break;
     }
