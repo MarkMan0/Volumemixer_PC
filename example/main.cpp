@@ -1,5 +1,5 @@
 #include <iostream>
-#include "VolumeAPI.h"
+#include "VolumeAPI/VolumeAPI.h"
 #include <fstream>
 #include <string>
 #include <optional>
@@ -29,6 +29,7 @@ int main() {
     }
 
     char c = std::getchar();
+    
 
     switch (c) {
       case 'q':
@@ -65,6 +66,7 @@ int main() {
         }
         break;
     }
+    flush_cin();
   }
 
 

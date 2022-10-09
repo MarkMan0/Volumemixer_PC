@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 
 volumemixer/*.ico
+build/
