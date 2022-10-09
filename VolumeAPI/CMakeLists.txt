@@ -7,4 +7,3 @@ set(SOURCES
 
 add_library(VolumeAPI STATIC ${SOURCES})
 target_include_directories(VolumeAPI PUBLIC "include/")
-target_compile_definitions(VolumeAPI PUBLIC UNICODE)
