@@ -13,6 +13,5 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options("/permissive-")
 endif()
 
-add_subdirectory("SerialPortWrapper/")
-add_subdirectory("./VolumeAPI")
-add_subdirectory("./example")
+add_subdirectory("libs/")
+add_subdirectory("examples/")
