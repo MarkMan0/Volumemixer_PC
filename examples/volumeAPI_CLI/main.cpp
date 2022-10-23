@@ -29,7 +29,7 @@ int main() {
     }
 
     char c = std::getchar();
-    
+
 
     switch (c) {
       case 'q':

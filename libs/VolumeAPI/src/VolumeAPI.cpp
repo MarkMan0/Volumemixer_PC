@@ -211,7 +211,7 @@ std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionI
 }
 
 std::vector<char> VolumeControl::AudioSessionInfo::get_icon_data() const {
-  return ProcessAPI::get_icon_from_pid(pid_);
+  return ProcessAPI::get_png_from_pid(pid_);
 }
 
 bool VolumeControl::init() {

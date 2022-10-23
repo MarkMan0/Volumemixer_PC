@@ -2,7 +2,12 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <Psapi.h>
-
+#include <fileapi.h>
+#include <memory>
+#include <locale>
+#include <codecvt>
+#include <fstream>
+#include "special_icons.h"
 
 struct ICONDIRENTRY {
   UCHAR nWidth;
@@ -140,8 +145,8 @@ std::wstring ProcessAPI::get_path_from_pid(int pid) {
 }
 
 
-std::vector<char> ProcessAPI::get_icon_from_pid(int pid) {
-  std::wstring path = get_path_from_pid(pid);
+static std::vector<char> get_process_icon_from_pid(int pid) {
+  std::wstring path = ProcessAPI::get_path_from_pid(pid);
 
   UINT num_icons = ExtractIconEx(path.c_str(), -1, NULL, NULL, 0);
 
@@ -154,4 +159,68 @@ std::vector<char> ProcessAPI::get_icon_from_pid(int pid) {
   }
 
   return out;
+}
+
+static std::vector<char> get_process_png_from_pid(int pid) {
+  // get .ico data
+  const auto ico_data = get_process_icon_from_pid(pid);
+
+  // get temp directory path
+  TCHAR temp_dir[MAX_PATH] = { 0 };
+  GetTempPath(MAX_PATH - 1, temp_dir);
+
+  // create unique files with needed extensions
+  TCHAR path_buff[MAX_PATH] = { 0 };
+  GetTempFileName(temp_dir, L"VOL", 0, path_buff);
+  std::wstring ico_path(path_buff);
+  ico_path += L".ico";
+
+  memset(path_buff, 0, sizeof(path_buff));
+  GetTempFileName(temp_dir, L"VOL", 0, path_buff);
+  std::wstring png_path(path_buff);
+  png_path += L".png";
+
+
+  // write .ico file to temp
+  std::ofstream ico_file(ico_path, std::ios::out | std::ios::binary);
+  for (const auto val : ico_data) {
+    ico_file << val;
+  }
+  ico_file.close();  // make sure to close before going further
+
+  // construct command to convert .ico to .png
+  std::wstring command;
+  command += L"magick ";
+  command += ico_path;
+  command += L" ";
+  command += png_path;
+  std::string cmd = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(command);
+
+  // call magick
+  std::system(cmd.c_str());
+
+  // read .png file
+  std::vector<char> png_data;
+  std::ifstream png_file(png_path, std::ios::in | std::ios::binary);
+  while (png_file) {
+    char c;
+    png_file >> c;
+    png_data.push_back(c);
+  }
+
+  return png_data;
+}
+
+
+std::vector<char> ProcessAPI::get_png_from_pid(int pid) {
+  if (pid == -1) {
+    // master icon
+    return std::vector<char>(icon_master.begin(), icon_master.end());
+  }
+  if (pid == 0) {
+    // system icon
+    return std::vector<char>(icon_system.begin(), icon_system.end());
+  }
+
+  return get_process_png_from_pid(pid);
 }
