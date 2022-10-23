@@ -14,9 +14,7 @@ static void serial_comm(SerialPortWrapper&);
 
 int main() {
   const int port_id = 8;
-  SerialPortWrapper port(8, 115200);
 
-  port.open();
   VolumeControl::init();
 
   std::atomic_bool runflag = true;
@@ -32,7 +30,18 @@ int main() {
   });
 
   while (runflag) {
-    serial_comm(port);
+    SerialPortWrapper port(8, 115200);
+    port.open();
+    using namespace std::chrono_literals;
+    auto sleep_time = 5s;
+    if (port()) {
+      sleep_time = 1s;
+      serial_comm(port);
+      port.close();
+    } else {
+      std::cout << "NoPort\n";
+    }
+    std::this_thread::sleep_for(sleep_time);
   }
 
   ui_thread.join();
@@ -67,6 +76,7 @@ void transfer_variant_bytes(const all_numeric& var, std::vector<uint8_t>& out_ve
 
 
 static void serial_comm(SerialPortWrapper& port) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
   char c = port.get_char();
   if (c == -1) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
