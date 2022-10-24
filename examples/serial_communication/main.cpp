@@ -7,6 +7,7 @@
 #include <variant>
 #include <locale>
 #include <codecvt>
+#include "CommSupervisor/supervisor.h"
 
 #include <string_view>
 
@@ -49,47 +50,6 @@ int main() {
   ui_thread.join();
 }
 
-using all_numeric = std::variant<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, char>;
-
-uint32_t crc32mpeg2(const uint8_t* buf, size_t len, uint32_t crc = 0xffffffff) {
-  for (unsigned i = 0; i < len; ++i) {
-    crc ^= buf[i] << 24;
-    for (unsigned j = 0; j < 8; ++j) {
-      if ((crc & 0x80000000) == 0) {
-        crc = crc << 1;
-      } else {
-        crc = (crc << 1) ^ 0x104c11db7;
-      }
-    }
-  }
-  return crc;
-}
-
-
-template <class T>
-void transfer_variant_bytes(const all_numeric& var, std::vector<uint8_t>& out_vec) {
-  if (std::holds_alternative<T>(var)) {
-    T val = std::get<T>(var);
-    auto iter = out_vec.insert(out_vec.end(), sizeof(T), 0);
-    uint8_t* dst_address = &(*iter);
-    memcpy(dst_address, &val, sizeof(val));
-  }
-}
-
-void transfer_variant_vec(const std::vector<all_numeric>& in, std::vector<uint8_t>& out) {
-  for (const auto& var : in) {
-    transfer_variant_bytes<uint8_t>(var, out);
-    transfer_variant_bytes<uint16_t>(var, out);
-    transfer_variant_bytes<uint32_t>(var, out);
-    transfer_variant_bytes<uint64_t>(var, out);
-    transfer_variant_bytes<int8_t>(var, out);
-    transfer_variant_bytes<int16_t>(var, out);
-    transfer_variant_bytes<int32_t>(var, out);
-    transfer_variant_bytes<int64_t>(var, out);
-    transfer_variant_bytes<char>(var, out);
-  }
-}
-
 
 static void serial_comm(SerialPortWrapper& port) {
   std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -125,52 +85,35 @@ static void serial_comm(SerialPortWrapper& port) {
 static void respond_load(SerialPortWrapper& port) {
   namespace VC = VolumeControl;
 
+  Supervisor sv;
+
+
   const auto sessions = VC::get_all_sessions_info();
-  std::vector<all_numeric> vec;
-  {
-    uint8_t sz = sessions.size();
-    uint32_t crc = crc32mpeg2(&sz, 1);
-    vec.push_back(sz);
-    vec.push_back(crc);
-  }
+
+  sv.append(static_cast<uint8_t>(sessions.size()));
+  sv.compute_crc();
 
   for (const auto& session : sessions) {
-    {
-      std::wcout << session << '\n';
-      uint32_t pid = session.pid_;
-      uint8_t vol = session.volume_;
-      uint8_t name_sz = session.filename_.size() + 1;
+    std::wcout << session << '\n';
 
-      uint32_t crc = crc32mpeg2(reinterpret_cast<uint8_t*>(&pid), 4);
-      crc = crc32mpeg2(&vol, 1, crc);
-      crc = crc32mpeg2(&name_sz, 1, crc);
+    sv.append(static_cast<uint32_t>(session.pid_));
+    sv.append(static_cast<uint8_t>(session.volume_));
+    sv.append(static_cast<uint8_t>(session.filename_.size() + 1));
+    sv.compute_crc();
 
-      vec.push_back(pid);
-      vec.push_back(vol);
-      vec.push_back(name_sz);
-      vec.push_back(crc);
+    const std::string s = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(session.filename_);
+    for (char c : s) {
+      sv.append(c);
     }
-    {
-      const std::string s = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(session.filename_);
-      const char* cstr = s.c_str();
-      uint32_t crc = crc32mpeg2(reinterpret_cast<const uint8_t*>(cstr), s.size() + 1);
-
-      for (char c : s) {
-        vec.push_back(c);
-      }
-      vec.push_back('\0');
-
-      vec.push_back(crc);
-    }
+    sv.append('\0');
+    sv.compute_crc();
   }
-  std::vector<uint8_t> out_vec;
-  transfer_variant_vec(vec, out_vec);
 
-  port.write(out_vec.data(), out_vec.size());
+  port.write(sv.get_buffer().data(), sv.get_buffer().size());
 }
 
 static void respond_img(SerialPortWrapper& port) {
-  std::cout << ">>>> Respond img\n";
+/*  std::cout << ">>>> Respond img\n";
   namespace VC = VolumeControl;
   const auto sessions = VC::get_all_sessions_info();
 
@@ -224,7 +167,8 @@ static void respond_img(SerialPortWrapper& port) {
     using namespace std::chrono_literals;
     while (port.get_char() == -1) {
       std::cout << "Processing chunk\n";
-    std::this_thread::sleep_for(10ms);
+      std::this_thread::sleep_for(10ms);
     }
   }
+  */
 }
