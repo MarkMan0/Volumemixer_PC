@@ -3,7 +3,7 @@
 
 
 
-class Supervisor {
+class Hasher {
 public:
   /// @brief compute the CRC for the buffer
   /// @param buffer pointer to memory

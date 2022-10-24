@@ -1,7 +1,7 @@
 #include "CommSupervisor/supervisor.h"
 
 
-uint32_t Supervisor::crc32mpeg2(const void* buffer, size_t len, uint32_t crc) {
+uint32_t Hasher::crc32mpeg2(const void* buffer, size_t len, uint32_t crc) {
   const uint8_t* buf = reinterpret_cast<const uint8_t*>(buffer);
   for (unsigned i = 0; i < len; ++i) {
     crc ^= buf[i] << 24;
@@ -16,12 +16,12 @@ uint32_t Supervisor::crc32mpeg2(const void* buffer, size_t len, uint32_t crc) {
   return crc;
 }
 
-bool Supervisor::verify_crc(const void* buffer, size_t len, uint32_t crc_in) {
+bool Hasher::verify_crc(const void* buffer, size_t len, uint32_t crc_in) {
   uint32_t crc = crc32mpeg2(buffer, len);
   return crc == crc_in;
 }
 
-bool Supervisor::verify_buffer(const void* buffer, size_t len) {
+bool Hasher::verify_buffer(const void* buffer, size_t len) {
   if (len < 5) {
     return false;
   }
@@ -31,13 +31,13 @@ bool Supervisor::verify_buffer(const void* buffer, size_t len) {
   return crc == crc_exp;
 }
 
-void Supervisor::begin_message() {
+void Hasher::begin_message() {
   buffer_.clear();
   last_crc_ = 0;
 }
 
 
-void Supervisor::compute_crc() {
+void Hasher::compute_crc() {
   auto start_iter = buffer_.cbegin() + last_crc_;
 
   const uint8_t* start_ptr = &(*start_iter);
@@ -49,7 +49,7 @@ void Supervisor::compute_crc() {
   last_crc_ += 4;
 }
 
-void Supervisor::append_any(const void* ptr, size_t sz) {
+void Hasher::append_any(const void* ptr, size_t sz) {
   const uint8_t* buff = reinterpret_cast<const uint8_t*>(ptr);
   buffer_.reserve(sz);
   for (size_t i = 0; i < sz; ++i) {
