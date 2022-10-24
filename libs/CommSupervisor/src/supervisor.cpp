@@ -1,7 +1,7 @@
 #include "CommSupervisor/supervisor.h"
 
 
-uint32_t Hasher::crc32mpeg2(const void* buffer, size_t len, uint32_t crc) {
+uint32_t CRC::crc32mpeg2(const void* buffer, size_t len, uint32_t crc) {
   const uint8_t* buf = reinterpret_cast<const uint8_t*>(buffer);
   for (unsigned i = 0; i < len; ++i) {
     crc ^= buf[i] << 24;
@@ -16,12 +16,12 @@ uint32_t Hasher::crc32mpeg2(const void* buffer, size_t len, uint32_t crc) {
   return crc;
 }
 
-bool Hasher::verify_crc(const void* buffer, size_t len, uint32_t crc_in) {
+bool CRC::verify_crc(const void* buffer, size_t len, uint32_t crc_in) {
   uint32_t crc = crc32mpeg2(buffer, len);
   return crc == crc_in;
 }
 
-bool Hasher::verify_buffer(const void* buffer, size_t len) {
+bool CRC::verify_crc(const void* buffer, size_t len) {
   if (len < 5) {
     return false;
   }
@@ -41,9 +41,9 @@ void Hasher::compute_crc() {
   auto start_iter = buffer_.cbegin() + last_crc_;
 
   const uint8_t* start_ptr = &(*start_iter);
-  uint32_t sz = buffer_.cend() - start_iter; 
+  uint32_t sz = buffer_.cend() - start_iter;
 
-  uint32_t crc = crc32mpeg2(start_ptr, sz);
+  uint32_t crc = CRC::crc32mpeg2(start_ptr, sz);
   append(crc);
   last_crc_ += sz;
   last_crc_ += 4;
@@ -55,4 +55,22 @@ void Hasher::append_any(const void* ptr, size_t sz) {
   for (size_t i = 0; i < sz; ++i) {
     buffer_.push_back(buff[i]);
   }
+}
+
+
+
+void DeHasher::append_any(const void* buff, size_t sz) {
+  const uint8_t* bytes = reinterpret_cast<const uint8_t*>(buff);
+  for (size_t i = 0; i < sz; ++i) {
+    buffer_.push_back(bytes[i]);
+  }
+}
+
+
+bool DeHasher::verify_crc() {
+  return CRC::verify_crc(buffer_.data(), buffer_.size());
+}
+
+bool DeHasher::verify_crc(uint32_t crc_in) {
+  return CRC::verify_crc(buffer_.data(), buffer_.size(), crc_in);
 }
