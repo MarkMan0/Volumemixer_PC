@@ -113,22 +113,22 @@ static void respond_load(SerialPortWrapper& port) {
 }
 
 static void respond_img(SerialPortWrapper& port) {
-/*  std::cout << ">>>> Respond img\n";
+  std::cout << ">>>> Respond img\n";
   namespace VC = VolumeControl;
   const auto sessions = VC::get_all_sessions_info();
+  Supervisor sv;
 
-  std::vector<all_numeric> vec;
-
-  int pid = 0;
+  int pid = -2;
 
   port.read(reinterpret_cast<uint8_t*>(&pid), sizeof(pid));
-  std::cout << "\t PID: " << pid << '\n';
+
   VC::AudioSessionInfo info;
   bool found = false;
   for (const auto& sess : sessions) {
     if (sess.pid_ == pid) {
       found = true;
       info = sess;
+      break;
     }
   }
   if (not found) {
@@ -138,28 +138,24 @@ static void respond_img(SerialPortWrapper& port) {
   // send size of image
   const auto png_data = info.get_icon_data();
   uint32_t png_sz = png_data.size();
-  vec.push_back(png_sz);
-  vec.push_back(crc32mpeg2(reinterpret_cast<uint8_t*>(&png_sz), sizeof(png_sz)));
-
-  std::vector<uint8_t> out_vec;
-  transfer_variant_vec(vec, out_vec);
-
-  port.write(out_vec.data(), out_vec.size());
-  vec.clear();
-  out_vec.clear();
+  sv.append(png_sz);
+  sv.compute_crc();
+  port.write(sv.get_buffer().data(), sv.get_buffer().size());
+  sv.begin_message();
 
   uint32_t max_chunk_size = 0;
   int read = 0;
   while (read < 4) {
-    read = port.read(reinterpret_cast<uint8_t*>(&max_chunk_size) + read, sizeof(max_chunk_size));
+    read += port.read(reinterpret_cast<uint8_t*>(&max_chunk_size) + read, sizeof(max_chunk_size) - read);
   }
 
 
   for (uint32_t bytes_written = 0; bytes_written < png_sz;) {
     uint32_t chunk_size = std::min(max_chunk_size, static_cast<uint32_t>(png_data.size() - bytes_written));
-    auto written = port.write(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
 
-    uint32_t crc = crc32mpeg2(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
+    auto written = port.write(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
+    uint32_t crc = Supervisor::crc32mpeg2(png_data.data() + bytes_written, chunk_size);
+
     port.write(reinterpret_cast<uint8_t*>(&crc), 4);
 
     bytes_written += written;
@@ -170,5 +166,4 @@ static void respond_img(SerialPortWrapper& port) {
       std::this_thread::sleep_for(10ms);
     }
   }
-  */
 }
