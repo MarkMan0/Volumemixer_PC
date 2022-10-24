@@ -210,7 +210,7 @@ std::wostream& operator<<(std::wostream& out, const VolumeControl::AudioSessionI
   return out;
 }
 
-std::vector<char> VolumeControl::AudioSessionInfo::get_icon_data() const {
+std::vector<uint8_t> VolumeControl::AudioSessionInfo::get_icon_data() const {
   return ProcessAPI::get_png_from_pid(pid_);
 }
 

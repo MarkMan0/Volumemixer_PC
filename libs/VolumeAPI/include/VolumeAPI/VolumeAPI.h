@@ -13,7 +13,7 @@ namespace VolumeControl {
     int pid_;                                               ///< process ID of the executable
     float volume_;                                          ///< volume of session in %
     bool muted_;                                            ///< is the session muted
-    [[nodiscard]] std::vector<char> get_icon_data() const;  ///< load the icon for the executable
+    [[nodiscard]] std::vector<uint8_t> get_icon_data() const;  ///< load the icon for the executable
   };
 
   /// @brief Initialize the Winapi

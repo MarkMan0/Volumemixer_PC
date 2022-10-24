@@ -25,7 +25,7 @@ struct ICONDIRENTRY {
 /// @param nColorBits color depth
 /// @param buff output buffer
 /// @return true on success
-static bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff) {
+static bool GetIconData(HICON hIcon, int nColorBits, std::vector<uint8_t>& buff) {
   if (offsetof(ICONDIRENTRY, nOffset) != 12) {
     return false;
   }
@@ -34,9 +34,8 @@ static bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff) {
 
 
   // Write header:
-  char icoHeader[6] = { 0, 0, 1, 0, 1, 0 };  // ICO file with 1 image
-  buff.insert(buff.end(), reinterpret_cast<const char*>(icoHeader),
-              reinterpret_cast<const char*>(icoHeader) + sizeof(icoHeader));
+  uint8_t icoHeader[6] = { 0, 0, 1, 0, 1, 0 };  // ICO file with 1 image
+  buff.insert(buff.end(), icoHeader, icoHeader + sizeof(icoHeader));
 
   // Get information about icon:
   ICONINFO iconInfo;
@@ -97,7 +96,7 @@ static bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff) {
   dir.nDataLength = pBmInfo->bmiHeader.biSizeImage + pMaskInfo->bmiHeader.biSizeImage + nBmInfoSize;
   dir.nOffset = sizeof(dir) + sizeof(icoHeader);
 
-  buff.insert(buff.end(), reinterpret_cast<const char*>(&dir), reinterpret_cast<const char*>(&dir) + sizeof(dir));
+  buff.insert(buff.end(), reinterpret_cast<const uint8_t*>(&dir), reinterpret_cast<const uint8_t*>(&dir) + sizeof(dir));
 
   // Write DIB header (including color table):
   int nBitsSize = pBmInfo->bmiHeader.biSizeImage;
@@ -105,16 +104,16 @@ static bool GetIconData(HICON hIcon, int nColorBits, std::vector<char>& buff) {
   pBmInfo->bmiHeader.biCompression = 0;
   pBmInfo->bmiHeader.biSizeImage += pMaskInfo->bmiHeader.biSizeImage;  // because the header is for both image and mask
 
-  buff.insert(buff.end(), reinterpret_cast<const char*>(&pBmInfo->bmiHeader),
-              reinterpret_cast<const char*>(&pBmInfo->bmiHeader) + nBmInfoSize);
+  buff.insert(buff.end(), reinterpret_cast<const uint8_t*>(&pBmInfo->bmiHeader),
+              reinterpret_cast<const uint8_t*>(&pBmInfo->bmiHeader) + nBmInfoSize);
 
   // Write image data:
-  buff.insert(buff.end(), reinterpret_cast<const char*>(bits.data()),
-              reinterpret_cast<const char*>(bits.data()) + nBitsSize);
+  buff.insert(buff.end(), reinterpret_cast<const uint8_t*>(bits.data()),
+              reinterpret_cast<const uint8_t*>(bits.data()) + nBitsSize);
 
   // Write mask data:
-  buff.insert(buff.end(), reinterpret_cast<const char*>(maskBits.data()),
-              reinterpret_cast<const char*>(maskBits.data()) + pMaskInfo->bmiHeader.biSizeImage);
+  buff.insert(buff.end(), reinterpret_cast<const uint8_t*>(maskBits.data()),
+              reinterpret_cast<const uint8_t*>(maskBits.data()) + pMaskInfo->bmiHeader.biSizeImage);
 
 
   DeleteObject(iconInfo.hbmColor);
@@ -145,12 +144,12 @@ std::wstring ProcessAPI::get_path_from_pid(int pid) {
 }
 
 
-static std::vector<char> get_process_icon_from_pid(int pid) {
+static std::vector<uint8_t> get_process_icon_from_pid(int pid) {
   std::wstring path = ProcessAPI::get_path_from_pid(pid);
 
   UINT num_icons = ExtractIconEx(path.c_str(), -1, NULL, NULL, 0);
 
-  std::vector<char> out;
+  std::vector<uint8_t> out;
   if (num_icons) {
     HICON ilarge{};
     ExtractIconEx(path.c_str(), 0, &ilarge, NULL, 1);
@@ -161,7 +160,7 @@ static std::vector<char> get_process_icon_from_pid(int pid) {
   return out;
 }
 
-static std::vector<char> get_process_png_from_pid(int pid) {
+static std::vector<uint8_t> get_process_png_from_pid(int pid) {
   // get .ico data
   const auto ico_data = get_process_icon_from_pid(pid);
 
@@ -200,26 +199,22 @@ static std::vector<char> get_process_png_from_pid(int pid) {
   std::system(cmd.c_str());
 
   // read .png file
-  std::vector<char> png_data;
   std::ifstream png_file(png_path, std::ios::in | std::ios::binary);
-  while (png_file) {
-    char c;
-    png_file >> c;
-    png_data.push_back(c);
-  }
+
+  std::vector<uint8_t> png_data((std::istreambuf_iterator<char>(png_file)), std::istreambuf_iterator<char>());
 
   return png_data;
 }
 
 
-std::vector<char> ProcessAPI::get_png_from_pid(int pid) {
+std::vector<uint8_t> ProcessAPI::get_png_from_pid(int pid) {
   if (pid == -1) {
     // master icon
-    return std::vector<char>(icon_master.begin(), icon_master.end());
+    return std::vector<uint8_t>(icon_master.begin(), icon_master.end());
   }
   if (pid == 0) {
     // system icon
-    return std::vector<char>(icon_system.begin(), icon_system.end());
+    return std::vector<uint8_t>(icon_system.begin(), icon_system.end());
   }
 
   return get_process_png_from_pid(pid);

@@ -154,7 +154,7 @@ static void respond_img(SerialPortWrapper& port) {
     uint32_t chunk_size = std::min(max_chunk_size, static_cast<uint32_t>(png_data.size() - bytes_written));
 
     auto written = port.write(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
-    uint32_t crc = Hasher::crc32mpeg2(png_data.data() + bytes_written, chunk_size);
+    uint32_t crc = CRC::crc32mpeg2(png_data.data() + bytes_written, chunk_size);
 
     port.write(reinterpret_cast<uint8_t*>(&crc), 4);
 
