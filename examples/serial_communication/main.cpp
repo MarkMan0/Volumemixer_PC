@@ -11,6 +11,8 @@
 #include <string_view>
 
 static void serial_comm(SerialPortWrapper&);
+static void respond_load(SerialPortWrapper&);
+static void respond_img(SerialPortWrapper&);
 
 int main() {
   const int port_id = 8;
@@ -74,19 +76,53 @@ void transfer_variant_bytes(const all_numeric& var, std::vector<uint8_t>& out_ve
   }
 }
 
+void transfer_variant_vec(const std::vector<all_numeric>& in, std::vector<uint8_t>& out) {
+  for (const auto& var : in) {
+    transfer_variant_bytes<uint8_t>(var, out);
+    transfer_variant_bytes<uint16_t>(var, out);
+    transfer_variant_bytes<uint32_t>(var, out);
+    transfer_variant_bytes<uint64_t>(var, out);
+    transfer_variant_bytes<int8_t>(var, out);
+    transfer_variant_bytes<int16_t>(var, out);
+    transfer_variant_bytes<int32_t>(var, out);
+    transfer_variant_bytes<int64_t>(var, out);
+    transfer_variant_bytes<char>(var, out);
+  }
+}
+
 
 static void serial_comm(SerialPortWrapper& port) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
   char c = port.get_char();
-  if (c == -1) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    return;
-  }
 
-  if (c != 1) {
-    return;
-  }
+  std::cout << "Got from serial: " << static_cast<int>(c) << '\n';
 
+  switch (c) {
+    case -1: {
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      break;
+    }
+
+    case 1: {
+      std::cout << "Responding to 0x01\n";
+      respond_load(port);
+      break;
+    }
+
+    case 2: {
+      std::cout << "Responding to 0x01\n";
+      respond_img(port);
+      break;
+    }
+
+    default:
+      std::cout << "Err: unknown\n";
+      break;
+  }
+}
+
+
+static void respond_load(SerialPortWrapper& port) {
   namespace VC = VolumeControl;
 
   const auto sessions = VC::get_all_sessions_info();
@@ -128,21 +164,67 @@ static void serial_comm(SerialPortWrapper& port) {
     }
   }
   std::vector<uint8_t> out_vec;
-  for (const auto& var : vec) {
-    transfer_variant_bytes<uint8_t>(var, out_vec);
-    transfer_variant_bytes<uint16_t>(var, out_vec);
-    transfer_variant_bytes<uint32_t>(var, out_vec);
-    transfer_variant_bytes<uint64_t>(var, out_vec);
-    transfer_variant_bytes<int8_t>(var, out_vec);
-    transfer_variant_bytes<int16_t>(var, out_vec);
-    transfer_variant_bytes<int32_t>(var, out_vec);
-    transfer_variant_bytes<int64_t>(var, out_vec);
-    transfer_variant_bytes<char>(var, out_vec);
-  }
+  transfer_variant_vec(vec, out_vec);
 
   port.write(out_vec.data(), out_vec.size());
+}
 
-  for (uint8_t d : out_vec) {
-    std::cout << (int)d << ", ";
+static void respond_img(SerialPortWrapper& port) {
+  std::cout << ">>>> Respond img\n";
+  namespace VC = VolumeControl;
+  const auto sessions = VC::get_all_sessions_info();
+
+  std::vector<all_numeric> vec;
+
+  int pid = 0;
+
+  port.read(reinterpret_cast<uint8_t*>(&pid), sizeof(pid));
+  std::cout << "\t PID: " << pid << '\n';
+  VC::AudioSessionInfo info;
+  bool found = false;
+  for (const auto& sess : sessions) {
+    if (sess.pid_ == pid) {
+      found = true;
+      info = sess;
+    }
+  }
+  if (not found) {
+    return;
+  }
+
+  // send size of image
+  const auto png_data = info.get_icon_data();
+  uint32_t png_sz = png_data.size();
+  vec.push_back(png_sz);
+  vec.push_back(crc32mpeg2(reinterpret_cast<uint8_t*>(&png_sz), sizeof(png_sz)));
+
+  std::vector<uint8_t> out_vec;
+  transfer_variant_vec(vec, out_vec);
+
+  port.write(out_vec.data(), out_vec.size());
+  vec.clear();
+  out_vec.clear();
+
+  uint32_t max_chunk_size = 0;
+  int read = 0;
+  while (read < 4) {
+    read = port.read(reinterpret_cast<uint8_t*>(&max_chunk_size) + read, sizeof(max_chunk_size));
+  }
+
+
+  for (uint32_t bytes_written = 0; bytes_written < png_sz;) {
+    uint32_t chunk_size = std::min(max_chunk_size, static_cast<uint32_t>(png_data.size() - bytes_written));
+    auto written = port.write(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
+
+    uint32_t crc = crc32mpeg2(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
+    port.write(reinterpret_cast<uint8_t*>(&crc), 4);
+
+    bytes_written += written;
+
+    using namespace std::chrono_literals;
+    while (port.get_char() == -1) {
+      std::cout << "Processing chunk\n";
+    std::this_thread::sleep_for(10ms);
+    }
   }
 }

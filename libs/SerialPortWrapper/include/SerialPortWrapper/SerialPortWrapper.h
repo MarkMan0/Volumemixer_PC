@@ -24,7 +24,7 @@ public:
   /// @brief  Check if port is open and ready
   bool operator()() const;
 
-  int write(uint8_t*, size_t);
+  int write(const uint8_t*, size_t);
   int read(uint8_t*, size_t);
   void flush();
   char get_char();

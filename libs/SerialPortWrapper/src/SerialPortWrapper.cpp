@@ -55,7 +55,7 @@ void SerialPortWrapper::close() {
   com_handle_ = INVALID_HANDLE_VALUE;
 }
 
-int SerialPortWrapper::write(uint8_t* data, size_t sz) {
+int SerialPortWrapper::write(const uint8_t* data, size_t sz) {
   if (com_handle_ == INVALID_HANDLE_VALUE) {
     return -1;
   }
