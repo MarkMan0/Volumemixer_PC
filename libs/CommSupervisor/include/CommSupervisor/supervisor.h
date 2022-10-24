@@ -38,12 +38,14 @@ public:
     append_any(static_cast<const void*>(mem), sz * sizeof(T));
   }
 
-  /// @brief compute and append the crc to the buffer
-  /// @details CRC is computed on the whole buffer, and not since last CRC
-  /// @return byt buffer with crc at the end
-  const std::vector<uint8_t>& end_message();
+  const std::vector<uint8_t>& get_buffer() {
+    return buffer_;
+  }
+
+  void compute_crc();
 
 private:
   void append_any(const void* mem, size_t sz);
   std::vector<uint8_t> buffer_;
+  size_t last_crc_ = 0;
 };

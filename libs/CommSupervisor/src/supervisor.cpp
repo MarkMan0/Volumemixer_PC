@@ -33,13 +33,20 @@ bool Supervisor::verify_buffer(const void* buffer, size_t len) {
 
 void Supervisor::begin_message() {
   buffer_.clear();
+  last_crc_ = 0;
 }
 
 
-const std::vector<uint8_t>& Supervisor::end_message() {
-  uint32_t crc = crc32mpeg2(buffer_.data(), buffer_.size());
+void Supervisor::compute_crc() {
+  auto start_iter = buffer_.cbegin() + last_crc_;
+
+  const uint8_t* start_ptr = &(*start_iter);
+  uint32_t sz = buffer_.cend() - start_iter; 
+
+  uint32_t crc = crc32mpeg2(start_ptr, sz);
   append(crc);
-  return buffer_;
+  last_crc_ += sz;
+  last_crc_ += 4;
 }
 
 void Supervisor::append_any(const void* ptr, size_t sz) {
