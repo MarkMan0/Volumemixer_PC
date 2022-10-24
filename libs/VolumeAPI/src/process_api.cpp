@@ -2,7 +2,7 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <Psapi.h>
-#include <fileapi.h>
+#include <filesystem>
 #include <memory>
 #include <locale>
 #include <codecvt>
@@ -165,20 +165,13 @@ static std::vector<uint8_t> get_process_png_from_pid(int pid) {
   const auto ico_data = get_process_icon_from_pid(pid);
 
   // get temp directory path
-  TCHAR temp_dir[MAX_PATH] = { 0 };
-  GetTempPath(MAX_PATH - 1, temp_dir);
+  namespace fs = std::filesystem;
+  const auto temp_dir = fs::temp_directory_path();
 
   // create unique files with needed extensions
-  TCHAR path_buff[MAX_PATH] = { 0 };
-  GetTempFileName(temp_dir, L"VOL", 0, path_buff);
-  std::wstring ico_path(path_buff);
-  ico_path += L".ico";
-
-  memset(path_buff, 0, sizeof(path_buff));
-  GetTempFileName(temp_dir, L"VOL", 0, path_buff);
-  std::wstring png_path(path_buff);
-  png_path += L".png";
-
+  const auto ico_path = temp_dir / L"VOL001.ico";
+  const auto png_path = temp_dir / L"VOL001.png";
+  
 
   // write .ico file to temp
   std::ofstream ico_file(ico_path, std::ios::out | std::ios::binary);
@@ -190,9 +183,9 @@ static std::vector<uint8_t> get_process_png_from_pid(int pid) {
   // construct command to convert .ico to .png
   std::wstring command;
   command += L"magick ";
-  command += ico_path;
+  command += ico_path.wstring();
   command += L" ";
-  command += png_path;
+  command += png_path.wstring();
   std::string cmd = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(command);
 
   // call magick
@@ -202,6 +195,10 @@ static std::vector<uint8_t> get_process_png_from_pid(int pid) {
   std::ifstream png_file(png_path, std::ios::in | std::ios::binary);
 
   std::vector<uint8_t> png_data((std::istreambuf_iterator<char>(png_file)), std::istreambuf_iterator<char>());
+
+  png_file.close();
+  fs::remove(ico_path);
+  fs::remove(png_path);
 
   return png_data;
 }
