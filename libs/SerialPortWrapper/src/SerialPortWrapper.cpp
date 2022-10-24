@@ -15,9 +15,9 @@ void SerialPortWrapper::open() {
 
   timeout_new_ = timeout_old_;
 
-  timeout_new_.ReadIntervalTimeout = MAXDWORD;
-  timeout_new_.ReadTotalTimeoutConstant = 0;
-  timeout_new_.ReadTotalTimeoutMultiplier = 0;
+  timeout_new_.ReadIntervalTimeout = 500;
+  timeout_new_.ReadTotalTimeoutConstant = 10;
+  timeout_new_.ReadTotalTimeoutMultiplier = 1000;
   timeout_new_.WriteTotalTimeoutMultiplier = 0;
   timeout_new_.WriteTotalTimeoutConstant = 0;
 

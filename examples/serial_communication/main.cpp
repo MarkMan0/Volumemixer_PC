@@ -11,8 +11,15 @@
 
 #include <string_view>
 
+#define DO_DEBUG
+#ifdef DO_DEBUG
 #define DEBUG_PRINT(ARG)  std::cout << ARG;
 #define DEBUG_WPRINT(ARG) std::wcout << ARG;
+#else
+  #define DEBUG_PRINT(ARG)
+  #define DEBUG_WPRINT(ARG)
+#endif
+
 
 template <class T>
 inline T mem2T(const uint8_t* mem) {
@@ -222,7 +229,7 @@ static std::vector<uint8_t> wait_data(SerialPortWrapper& port, size_t n) {
     }
 
     if ((std::chrono::steady_clock::now() - start) > 10s) {
-      std::cerr << "Serial timeout\n";
+      DEBUG_PRINT("Serial timeout\n");
       return {};
     }
   }
