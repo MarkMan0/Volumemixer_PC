@@ -11,9 +11,18 @@
 
 #include <string_view>
 
-static void serial_comm(SerialPortWrapper&);
+#define DEBUG_PRINT(ARG)  std::cout << ARG;
+#define DEBUG_WPRINT(ARG) std::wcout << ARG;
+
+template <class T>
+inline T mem2T(const uint8_t* mem) {
+  return *reinterpret_cast<const T*>(mem);
+}
+
+static bool serial_comm(SerialPortWrapper&);
 static void respond_load(SerialPortWrapper&);
 static void respond_img(SerialPortWrapper&);
+static std::vector<uint8_t> wait_data(SerialPortWrapper&, size_t);
 
 int main() {
   const int port_id = 8;
@@ -32,18 +41,27 @@ int main() {
     }
   });
 
+  DEBUG_PRINT("Entering main loop\n");
   while (runflag) {
+    DEBUG_PRINT("While loop...\n");
     SerialPortWrapper port(8, 115200);
     port.open();
     using namespace std::chrono_literals;
     auto sleep_time = 5s;
     if (port()) {
+      DEBUG_PRINT("Port is open\n");
       sleep_time = 1s;
-      serial_comm(port);
+      bool b = true;
+      while (b) {
+        DEBUG_PRINT("Entering data handler\n");
+        b = serial_comm(port);
+      }
+      DEBUG_PRINT("Port timed out, closing\n");
       port.close();
     } else {
-      std::cout << "NoPort\n";
+      DEBUG_PRINT("No port\n");
     }
+    DEBUG_PRINT("Sleeping\n");
     std::this_thread::sleep_for(sleep_time);
   }
 
@@ -51,11 +69,15 @@ int main() {
 }
 
 
-static void serial_comm(SerialPortWrapper& port) {
-  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-  char c = port.get_char();
+static bool serial_comm(SerialPortWrapper& port) {
+  const auto buffer = wait_data(port, 1);
+  if (buffer.size() < 1) {
+    DEBUG_PRINT("No data\n");
+    return false;
+  }
 
-  std::cout << "Got from serial: " << static_cast<int>(c) << '\n';
+  const uint8_t c = mem2T<uint8_t>(buffer.data());
+  DEBUG_PRINT("Got from serial: " << static_cast<int>(c) << '\n');
 
   switch (c) {
     case -1: {
@@ -64,21 +86,25 @@ static void serial_comm(SerialPortWrapper& port) {
     }
 
     case 1: {
-      std::cout << "Responding to 0x01\n";
+      DEBUG_PRINT("respond_load()\n");
       respond_load(port);
+      DEBUG_PRINT("respond_load() DONE\n");
       break;
     }
 
     case 2: {
-      std::cout << "Responding to 0x01\n";
+      DEBUG_PRINT("respond_img()\n");
       respond_img(port);
+      DEBUG_PRINT("respond_img() DONE\n");
       break;
     }
 
     default:
-      std::cout << "Err: unknown\n";
+      DEBUG_PRINT("Err: unknown\n");
       break;
   }
+
+  return true;
 }
 
 
@@ -86,17 +112,15 @@ static void respond_load(SerialPortWrapper& port) {
   namespace VC = VolumeControl;
 
   Hasher sv;
-
-
   const auto sessions = VC::get_all_sessions_info();
 
   sv.append(static_cast<uint8_t>(sessions.size()));
   sv.compute_crc();
 
   for (const auto& session : sessions) {
-    std::wcout << session << '\n';
+    //std::wcout << session << '\n';
 
-    sv.append(static_cast<uint32_t>(session.pid_));
+    sv.append(static_cast<int16_t>(session.pid_));
     sv.append(static_cast<uint8_t>(session.volume_));
     sv.append(static_cast<uint8_t>(session.filename_.size() + 1));
     sv.compute_crc();
@@ -108,19 +132,26 @@ static void respond_load(SerialPortWrapper& port) {
     sv.append('\0');
     sv.compute_crc();
   }
-
+  DEBUG_PRINT("\t data length: " << sv.get_buffer().size() << '\n');
   port.write(sv.get_buffer().data(), sv.get_buffer().size());
 }
 
 static void respond_img(SerialPortWrapper& port) {
-  std::cout << ">>>> Respond img\n";
   namespace VC = VolumeControl;
+
   const auto sessions = VC::get_all_sessions_info();
-  Hasher sv;
+  Hasher hasher;
+  DeHasher dehasher;
 
-  int pid = -2;
 
-  port.read(reinterpret_cast<uint8_t*>(&pid), sizeof(pid));
+  const auto pid_data = wait_data(port, sizeof(int16_t));
+  if (pid_data.size() < sizeof(int16_t)) {
+    DEBUG_PRINT("\t No PID\n");
+    return;
+  }
+  const int16_t pid = mem2T<int16_t>(pid_data.data());
+
+  DEBUG_PRINT("\tPID: " << pid << '\n');
 
   VC::AudioSessionInfo info;
   bool found = false;
@@ -132,26 +163,33 @@ static void respond_img(SerialPortWrapper& port) {
     }
   }
   if (not found) {
+    DEBUG_PRINT("\t session not found\n");
     return;
   }
+  DEBUG_WPRINT("\tSession: " << info.filename_ << '\n');
 
   // send size of image
   const auto png_data = info.get_icon_data();
   uint32_t png_sz = png_data.size();
-  sv.append(png_sz);
-  sv.compute_crc();
-  port.write(sv.get_buffer().data(), sv.get_buffer().size());
-  sv.begin_message();
+  DEBUG_PRINT("\tPNG size: " << png_sz);
+  hasher.append(png_sz);
+  hasher.compute_crc();
+  DEBUG_PRINT("\tWriting bytes: " << hasher.get_buffer().size() << '\n');
+  port.write(hasher.get_buffer().data(), hasher.get_buffer().size());
+  hasher.begin_message();
 
-  uint32_t max_chunk_size = 0;
-  int read = 0;
-  while (read < 4) {
-    read += port.read(reinterpret_cast<uint8_t*>(&max_chunk_size) + read, sizeof(max_chunk_size) - read);
+
+  const auto chunk_data = wait_data(port, sizeof(uint32_t));
+  if (chunk_data.size() < sizeof(uint32_t)) {
+    DEBUG_PRINT("\t No chunk_data\n");
+    return;
   }
-
+  const uint32_t max_chunk_size = mem2T<uint32_t>(chunk_data.data());
+  DEBUG_PRINT("\tChunk size is: " << max_chunk_size << '\n');
 
   for (uint32_t bytes_written = 0; bytes_written < png_sz;) {
     uint32_t chunk_size = std::min(max_chunk_size, static_cast<uint32_t>(png_data.size() - bytes_written));
+    DEBUG_PRINT("\tSending chunk: " << max_chunk_size << '\n');
 
     auto written = port.write(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
     uint32_t crc = CRC::crc32mpeg2(png_data.data() + bytes_written, chunk_size);
@@ -160,10 +198,34 @@ static void respond_img(SerialPortWrapper& port) {
 
     bytes_written += written;
 
-    using namespace std::chrono_literals;
-    while (port.get_char() == -1) {
-      std::cout << "Processing chunk\n";
-      std::this_thread::sleep_for(10ms);
+    DEBUG_PRINT("\tWaiting chunk response\n");
+    if (wait_data(port, 1).size() < 1) {
+      DEBUG_PRINT("\tChunk timeout\n");
+      return;
     }
   }
+}
+
+
+
+static std::vector<uint8_t> wait_data(SerialPortWrapper& port, size_t n) {
+  std::vector<uint8_t> buff;
+  using namespace std::chrono_literals;
+
+  auto start = std::chrono::steady_clock::now();
+  buff.reserve(n);
+
+  while (buff.size() < n) {
+    uint8_t b;
+    if (port.read(&b, 1)) {
+      buff.push_back(b);
+    }
+
+    if ((std::chrono::steady_clock::now() - start) > 10s) {
+      std::cerr << "Serial timeout\n";
+      return {};
+    }
+  }
+
+  return buff;
 }

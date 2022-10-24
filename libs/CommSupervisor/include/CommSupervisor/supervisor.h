@@ -55,6 +55,8 @@ private:
 
 class DeHasher {
 public:
+  void reset();
+
   template <class T>
   void append(const T& data) {
     append_any(&data, sizeof(T));

@@ -58,6 +58,10 @@ void Hasher::append_any(const void* ptr, size_t sz) {
 }
 
 
+void DeHasher::reset() {
+  buffer_.clear();
+}
+
 
 void DeHasher::append_any(const void* buff, size_t sz) {
   const uint8_t* bytes = reinterpret_cast<const uint8_t*>(buff);
