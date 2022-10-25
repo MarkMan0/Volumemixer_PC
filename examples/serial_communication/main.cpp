@@ -159,6 +159,7 @@ static void respond_load(SerialPortWrapper& port) {
 
     sv.append(static_cast<int16_t>(session.pid_));
     sv.append(static_cast<uint8_t>(session.volume_));
+    sv.append(static_cast<uint8_t>(session.muted_));
     sv.append(static_cast<uint8_t>(session.filename_.size() + 1));
     sv.compute_crc();
 
