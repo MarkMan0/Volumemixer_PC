@@ -29,6 +29,7 @@ inline T mem2T(const uint8_t* mem) {
 static bool serial_comm(SerialPortWrapper&);
 static void respond_load(SerialPortWrapper&);
 static void respond_img(SerialPortWrapper&);
+static void respond_set_volume(SerialPortWrapper&);
 static std::vector<uint8_t> wait_data(SerialPortWrapper&, size_t);
 
 int main() {
@@ -103,6 +104,13 @@ static bool serial_comm(SerialPortWrapper& port) {
       DEBUG_PRINT("respond_img()\n");
       respond_img(port);
       DEBUG_PRINT("respond_img() DONE\n");
+      break;
+    }
+
+    case 3: {
+      DEBUG_PRINT("respond_set_volume()\n");
+      respond_set_volume(port);
+      DEBUG_PRINT("respond_set_volume() DONE\n");
       break;
     }
 
@@ -243,4 +251,26 @@ static std::vector<uint8_t> wait_data(SerialPortWrapper& port, size_t n) {
   }
 
   return buff;
+}
+
+
+static void respond_set_volume(SerialPortWrapper& port) {
+  constexpr size_t expected_length = sizeof(int16_t) + sizeof(uint8_t) + 4;
+  const auto vol_data = wait_data(port, expected_length);
+  if (vol_data.size() < expected_length) {
+    DEBUG_PRINT("\t No data\n");
+    return;
+  }
+
+  if (not CRC::verify_crc(vol_data.data(), expected_length)) {
+    DEBUG_PRINT("\tCRC error\n");
+    return;
+  }
+
+  const int16_t pid = mem2T<int16_t>(vol_data.data());
+  const uint8_t vol = mem2T<uint8_t>(vol_data.data() + 2);
+
+  VolumeControl::set_volume(pid, vol);
+
+  DEBUG_PRINT("\tDone\n");
 }
