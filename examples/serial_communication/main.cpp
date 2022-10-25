@@ -12,7 +12,16 @@
 
 #include <string_view>
 
-#define DO_DEBUG
+namespace mixer {
+  enum commands : uint8_t {
+    LOAD_ALL = 0x01,
+    READ_IMG = 0x02,
+    SET_VOLUME = 0x03,
+    RESPONSE_OK = 0xA0,
+  };
+}
+
+//#define DO_DEBUG
 #ifdef DO_DEBUG
   #define DEBUG_PRINT(ARG)  std::cout << ARG;
   #define DEBUG_WPRINT(ARG) std::wcout << ARG;
@@ -94,21 +103,21 @@ static bool serial_comm(SerialPortWrapper& port) {
       break;
     }
 
-    case 1: {
+    case mixer::commands::LOAD_ALL: {
       DEBUG_PRINT("respond_load()\n");
       respond_load(port);
       DEBUG_PRINT("respond_load() DONE\n");
       break;
     }
 
-    case 2: {
+    case mixer::commands::READ_IMG: {
       DEBUG_PRINT("respond_img()\n");
       respond_img(port);
       DEBUG_PRINT("respond_img() DONE\n");
       break;
     }
 
-    case 3: {
+    case mixer::commands::SET_VOLUME: {
       DEBUG_PRINT("respond_set_volume()\n");
       respond_set_volume(port);
       DEBUG_PRINT("respond_set_volume() DONE\n");
