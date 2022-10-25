@@ -17,6 +17,7 @@ namespace mixer {
     LOAD_ALL = 0x01,
     READ_IMG = 0x02,
     SET_VOLUME = 0x03,
+    ECHO = 0x04,
     RESPONSE_OK = 0xA0,
   };
 }
@@ -40,6 +41,7 @@ static bool serial_comm(SerialPortWrapper&);
 static void respond_load(SerialPortWrapper&);
 static void respond_img(SerialPortWrapper&);
 static void respond_set_volume(SerialPortWrapper&);
+static void respond_echo(SerialPortWrapper&);
 static std::vector<uint8_t> wait_data(SerialPortWrapper&, size_t);
 
 int main() {
@@ -121,6 +123,13 @@ static bool serial_comm(SerialPortWrapper& port) {
       DEBUG_PRINT("respond_set_volume()\n");
       respond_set_volume(port);
       DEBUG_PRINT("respond_set_volume() DONE\n");
+      break;
+    }
+
+    case mixer::commands::ECHO: {
+      DEBUG_PRINT("respond_echo()\n");
+      respond_echo(port);
+      DEBUG_PRINT("respond_echo() DONE\n");
       break;
     }
 
@@ -286,4 +295,11 @@ static void respond_set_volume(SerialPortWrapper& port) {
   VolumeControl::set_volume(pid, vol);
 
   DEBUG_PRINT("\tDone\n");
+}
+
+static void respond_echo(SerialPortWrapper& port) {
+  uint8_t c = '\0';
+  while (port.read(&c, 1)) {
+    std::cout << static_cast<char>(c);
+  }
 }
