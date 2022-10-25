@@ -192,6 +192,10 @@ static void respond_img(SerialPortWrapper& port) {
     return;
   }
   const uint32_t max_chunk_size = mem2T<uint32_t>(chunk_data.data());
+  if (max_chunk_size > 300) {
+    DEBUG_PRINT("\t Max chunk size too big\n");
+    return;
+  }
   DEBUG_PRINT("\tChunk size is: " << max_chunk_size << '\n');
 
   for (uint32_t bytes_written = 0; bytes_written < png_sz;) {
@@ -205,7 +209,7 @@ static void respond_img(SerialPortWrapper& port) {
 
     bytes_written += written;
 
-    DEBUG_PRINT("\tWaiting chunk response\n");
+    //DEBUG_PRINT("\tWaiting chunk response\n");
     if (wait_data(port, 1).size() < 1) {
       DEBUG_PRINT("\tChunk timeout\n");
       return;
