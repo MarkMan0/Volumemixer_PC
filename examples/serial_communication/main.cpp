@@ -13,8 +13,8 @@
 
 #define DO_DEBUG
 #ifdef DO_DEBUG
-#define DEBUG_PRINT(ARG)  std::cout << ARG;
-#define DEBUG_WPRINT(ARG) std::wcout << ARG;
+  #define DEBUG_PRINT(ARG)  std::cout << ARG;
+  #define DEBUG_WPRINT(ARG) std::wcout << ARG;
 #else
   #define DEBUG_PRINT(ARG)
   #define DEBUG_WPRINT(ARG)
@@ -125,7 +125,7 @@ static void respond_load(SerialPortWrapper& port) {
   sv.compute_crc();
 
   for (const auto& session : sessions) {
-    //std::wcout << session << '\n';
+    // std::wcout << session << '\n';
 
     sv.append(static_cast<int16_t>(session.pid_));
     sv.append(static_cast<uint8_t>(session.volume_));
@@ -151,9 +151,13 @@ static void respond_img(SerialPortWrapper& port) {
   DeHasher dehasher;
 
 
-  const auto pid_data = wait_data(port, sizeof(int16_t));
-  if (pid_data.size() < sizeof(int16_t)) {
+  const auto pid_data = wait_data(port, sizeof(int16_t) + 4);
+  if (pid_data.size() < sizeof(int16_t) + 4) {
     DEBUG_PRINT("\t No PID\n");
+    return;
+  }
+  if (not CRC::verify_crc(pid_data.data(), 6)) {
+    DEBUG_PRINT("\tPID CRC Error\n");
     return;
   }
   const int16_t pid = mem2T<int16_t>(pid_data.data());
@@ -186,21 +190,21 @@ static void respond_img(SerialPortWrapper& port) {
   hasher.begin_message();
 
 
-  const auto chunk_data = wait_data(port, sizeof(uint32_t));
-  if (chunk_data.size() < sizeof(uint32_t)) {
+  const auto chunk_data = wait_data(port, sizeof(uint32_t) + 4);
+  if (chunk_data.size() < sizeof(uint32_t) + 4) {
     DEBUG_PRINT("\t No chunk_data\n");
     return;
   }
-  const uint32_t max_chunk_size = mem2T<uint32_t>(chunk_data.data());
-  if (max_chunk_size > 300) {
-    DEBUG_PRINT("\t Max chunk size too big\n");
+  if (not CRC::verify_crc(chunk_data.data(), 8)) {
+    DEBUG_PRINT("\tChunk CRC error\n");
     return;
   }
+  const uint32_t max_chunk_size = mem2T<uint32_t>(chunk_data.data());
   DEBUG_PRINT("\tChunk size is: " << max_chunk_size << '\n');
+
 
   for (uint32_t bytes_written = 0; bytes_written < png_sz;) {
     uint32_t chunk_size = std::min(max_chunk_size, static_cast<uint32_t>(png_data.size() - bytes_written));
-    DEBUG_PRINT("\tSending chunk: " << max_chunk_size << '\n');
 
     auto written = port.write(reinterpret_cast<const uint8_t*>(png_data.data()) + bytes_written, chunk_size);
     uint32_t crc = CRC::crc32mpeg2(png_data.data() + bytes_written, chunk_size);
@@ -209,12 +213,12 @@ static void respond_img(SerialPortWrapper& port) {
 
     bytes_written += written;
 
-    //DEBUG_PRINT("\tWaiting chunk response\n");
     if (wait_data(port, 1).size() < 1) {
       DEBUG_PRINT("\tChunk timeout\n");
       return;
     }
   }
+  DEBUG_PRINT("\tSend IMG success\n");
 }
 
 
