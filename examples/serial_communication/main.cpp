@@ -18,6 +18,7 @@ namespace mixer {
     READ_IMG = 0x02,
     SET_VOLUME = 0x03,
     ECHO = 0x04,
+    SET_MUTE = 0x05,
     RESPONSE_OK = 0xA0,
   };
 }
@@ -42,6 +43,7 @@ static void respond_load(SerialPortWrapper&);
 static void respond_img(SerialPortWrapper&);
 static void respond_set_volume(SerialPortWrapper&);
 static void respond_echo(SerialPortWrapper&);
+static void respond_mute(SerialPortWrapper&);
 static std::vector<uint8_t> wait_data(SerialPortWrapper&, size_t);
 
 int main() {
@@ -130,6 +132,13 @@ static bool serial_comm(SerialPortWrapper& port) {
       DEBUG_PRINT("respond_echo()\n");
       respond_echo(port);
       DEBUG_PRINT("respond_echo() DONE\n");
+      break;
+    }
+
+    case mixer::commands::SET_MUTE: {
+      DEBUG_PRINT("respond_mute()\n");
+      respond_mute(port);
+      DEBUG_PRINT("respond_mute() DONE\n");
       break;
     }
 
@@ -303,4 +312,21 @@ static void respond_echo(SerialPortWrapper& port) {
   while (port.read(&c, 1)) {
     std::cout << static_cast<char>(c);
   }
+}
+
+static void respond_mute(SerialPortWrapper& port) {
+  const auto mute_data = wait_data(port, 2 + 1 + 4);  // pid, muted, crc
+  if (mute_data.size() < 2 + 1 + 4) {
+    DEBUG_PRINT("\t No data\n");
+    return;
+  }
+  if (not CRC::verify_crc(mute_data.data(), 2 + 1 + 4)) {
+    DEBUG_PRINT("\tCRC error\n");
+    return;
+  }
+
+  const int16_t pid = mem2T<int16_t>(mute_data.data());
+  const bool mute = mem2T<uint8_t>(mute_data.data() + 2);
+
+  VolumeControl::set_muted(pid, mute);
 }
