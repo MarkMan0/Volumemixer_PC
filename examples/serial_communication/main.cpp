@@ -8,6 +8,7 @@
 #include <locale>
 #include <codecvt>
 #include "CommSupervisor/supervisor.h"
+#include <algorithm>
 
 #include <string_view>
 
@@ -127,7 +128,10 @@ static void respond_load(SerialPortWrapper& port) {
   namespace VC = VolumeControl;
 
   Hasher sv;
-  const auto sessions = VC::get_all_sessions_info();
+  auto sessions = VC::get_all_sessions_info();
+
+  std::sort(sessions.begin(), sessions.end(),
+            [](const VC::AudioSessionInfo& l, const VC::AudioSessionInfo& r) { return l.pid_ < r.pid_; });
 
   sv.append(static_cast<uint8_t>(sessions.size()));
   sv.compute_crc();
