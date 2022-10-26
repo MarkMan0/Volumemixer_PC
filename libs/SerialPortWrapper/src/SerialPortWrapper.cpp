@@ -4,7 +4,8 @@
 SerialPortWrapper::SerialPortWrapper(std::wstring_view port, int baud) : port_name_(port), baud_(baud) {
 }
 
-SerialPortWrapper::SerialPortWrapper(int port, int baud) : SerialPortWrapper(L"//.////COM" + std::to_wstring(port), baud) {
+SerialPortWrapper::SerialPortWrapper(int port, int baud)
+  : SerialPortWrapper(L"//.////COM" + std::to_wstring(port), baud) {
 }
 
 void SerialPortWrapper::open() {

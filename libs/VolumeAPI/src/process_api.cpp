@@ -171,7 +171,7 @@ static std::vector<uint8_t> get_process_png_from_pid(int pid) {
   // create unique files with needed extensions
   const auto ico_path = temp_dir / L"VOL001.ico";
   const auto png_path = temp_dir / L"VOL001.png";
-  
+
 
   // write .ico file to temp
   std::ofstream ico_file(ico_path, std::ios::out | std::ios::binary);

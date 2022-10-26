@@ -8,11 +8,11 @@ namespace VolumeControl {
 
   /// @brief Describes an audio session
   struct AudioSessionInfo {
-    std::wstring path_;                                     ///< Path of the executable
-    std::wstring filename_;                                 ///< name of the executable
-    int pid_;                                               ///< process ID of the executable
-    float volume_;                                          ///< volume of session in %
-    bool muted_;                                            ///< is the session muted
+    std::wstring path_;                                        ///< Path of the executable
+    std::wstring filename_;                                    ///< name of the executable
+    int pid_;                                                  ///< process ID of the executable
+    float volume_;                                             ///< volume of session in %
+    bool muted_;                                               ///< is the session muted
     [[nodiscard]] std::vector<uint8_t> get_icon_data() const;  ///< load the icon for the executable
   };
 
