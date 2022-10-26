@@ -19,7 +19,8 @@ namespace mixer {
     SET_VOLUME = 0x03,
     ECHO = 0x04,
     SET_MUTE = 0x05,
-    RESPONSE_OK = 0xA0,
+    RESPONSE_OK_0 = 0xA0,
+    RESPONSE_OK_1 = 0xA1,
   };
 }
 
@@ -181,6 +182,13 @@ static void respond_load(SerialPortWrapper& port) {
   }
   DEBUG_PRINT("\t data length: " << sv.get_buffer().size() << '\n');
   port.write(sv.get_buffer().data(), sv.get_buffer().size());
+
+  auto data = wait_data(port, 2);
+  if (data.size() >= 2 && data[0] == mixer::commands::RESPONSE_OK_0 && data[1] == mixer::commands::RESPONSE_OK_1) {
+    DEBUG_PRINT("\tsend success\n");
+  } else {
+    DEBUG_PRINT("\tsend failure\n");
+  }
 }
 
 static void respond_img(SerialPortWrapper& port) {
