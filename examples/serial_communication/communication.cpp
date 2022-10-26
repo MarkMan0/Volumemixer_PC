@@ -21,6 +21,7 @@ static inline T mem2T(const uint8_t* mem) {
 bool serial_comm(SerialPortWrapper& port) {
   const auto buffer = wait_data(port, 1);
   if (buffer.size() < 1) {
+    glob_last_crc = 0;
     DEBUG_PRINT("No data\n");
     return false;
   }
@@ -28,11 +29,6 @@ bool serial_comm(SerialPortWrapper& port) {
   const uint8_t c = mem2T<uint8_t>(buffer.data());
 
   switch (c) {
-    case -1: {
-      std::this_thread::sleep_for(std::chrono::milliseconds(200));
-      break;
-    }
-
     case mixer::commands::LOAD_ALL: {
       DEBUG_PRINT("respond_load()\n");
       respond_load(port);

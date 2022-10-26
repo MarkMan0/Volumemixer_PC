@@ -4,50 +4,85 @@
 #include <atomic>
 #include <chrono>
 #include "communication.h"
+#include <memory>
 
+
+enum state_t : uint8_t {
+  PORT_CLOSE = 0,
+  PORT_SEARCHING,
+  PORT_OPEN,
+  NUM_STATES,
+};
+
+enum event_t : uint8_t {
+  EVENT_SUCCESS = 0,
+  EVENT_FAILURE,
+  NUM_EVENTS,
+};
+
+
+event_t port_close_handler();
+event_t port_searching_handler();
+event_t port_open_handler();
+
+static constexpr size_t num_states = static_cast<size_t>(state_t::NUM_STATES);
+static constexpr size_t num_events = static_cast<size_t>(event_t::NUM_EVENTS);
+
+using fcn_t = event_t (*)(void);
+
+
+std::unique_ptr<SerialPortWrapper> gPort{ nullptr };
 
 int main() {
-  const int port_id = 8;
+  static fcn_t state_table[] = { port_close_handler, port_searching_handler, port_open_handler };
+  static state_t transition_table[num_states][num_events] = { { PORT_SEARCHING, PORT_SEARCHING },
+                                                              { PORT_OPEN, PORT_SEARCHING },
+                                                              { PORT_OPEN, PORT_CLOSE } };
 
   if (not VolumeControl::init()) {
     return -1;
   }
 
-  std::atomic_bool runflag = true;
+  state_t curr_state = state_t::PORT_SEARCHING;
 
-  std::thread ui_thread([&runflag]() -> void {
-    while (runflag) {
-      char q = 0;
-      std::cin >> q;
-      if (q == 'q' || q == 'e') {
-        runflag = false;
-      }
-    }
-  });
 
   DEBUG_PRINT("Entering main loop\n");
-  while (runflag) {
+  while (1) {
     DEBUG_PRINT("While loop...\n");
-    SerialPortWrapper port(8, 115200);
-    port.open();
-    using namespace std::chrono_literals;
-    auto sleep_time = 5s;
-    if (port()) {
-      DEBUG_PRINT("Port is open\n");
-      sleep_time = 1s;
-      bool b = true;
-      while (b) {
-        DEBUG_PRINT("Entering data handler\n");
-        b = serial_comm(port);
-      }
-      DEBUG_PRINT("Port timed out, closing\n");
-      port.close();
-    } else {
-      DEBUG_PRINT("No port\n");
-    }
-    DEBUG_PRINT("Sleeping\n");
-    std::this_thread::sleep_for(sleep_time);
-  }
 
-  ui_thread.join();
+    fcn_t curr_handler = state_table[curr_state];
+    if (curr_handler) {
+      event_t ev = curr_handler();
+      curr_state = transition_table[curr_state][ev];
+    } else {
+      break;
+    }
+  }
+}
+
+
+event_t port_close_handler() {
+  gPort->close();
+  return event_t::EVENT_SUCCESS;
+}
+
+event_t port_searching_handler() {
+  // TODO
+  gPort = std::make_unique<SerialPortWrapper>(8, 115200);
+  gPort->open();
+  if ((*gPort)()) {
+    return event_t::EVENT_SUCCESS;
+  } else {
+    // if can't open, sleep
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    return event_t::EVENT_FAILURE;
+  }
+}
+
+event_t port_open_handler() {
+  if (serial_comm(*gPort)) {
+    return event_t::EVENT_SUCCESS;
+  } else {
+    return event_t::EVENT_FAILURE;
+  }
 }
