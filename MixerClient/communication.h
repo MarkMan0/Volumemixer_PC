@@ -4,8 +4,7 @@
 #include <vector>
 #include <iostream>
 
-#define DO_DEBUG
-#ifdef DO_DEBUG
+#ifndef NDEBUG
   #define DEBUG_PRINT(ARG)  std::cout << ARG;
   #define DEBUG_WPRINT(ARG) std::wcout << ARG;
 #else
