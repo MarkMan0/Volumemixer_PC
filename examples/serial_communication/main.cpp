@@ -5,6 +5,7 @@
 #include <chrono>
 #include "communication.h"
 #include <memory>
+#include "ComEnum/ComEnum.h"
 
 
 enum state_t : uint8_t {
@@ -67,16 +68,21 @@ event_t port_close_handler() {
 }
 
 event_t port_searching_handler() {
-  // TODO
-  gPort = std::make_unique<SerialPortWrapper>(8, 115200);
-  gPort->open();
-  if ((*gPort)()) {
-    return event_t::EVENT_SUCCESS;
-  } else {
-    // if can't open, sleep
-    std::this_thread::sleep_for(std::chrono::seconds(10));
-    return event_t::EVENT_FAILURE;
+  const auto ports = get_com_ports();
+  const std::wstring target_descr = L"External Volume Mixer";
+
+  for (const auto& port : ports) {
+    if (port.bus_reported_dev_descr_ == target_descr) {
+      gPort = std::make_unique<SerialPortWrapper>(port.port_str_, 115200);
+      gPort->open();
+      if ((*gPort)()) {
+        return event_t::EVENT_SUCCESS;
+      }
+    }
   }
+
+  std::this_thread::sleep_for(std::chrono::seconds(10));
+  return event_t::EVENT_FAILURE;
 }
 
 event_t port_open_handler() {
