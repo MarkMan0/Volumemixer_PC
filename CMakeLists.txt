@@ -15,3 +15,4 @@ endif()
 
 add_subdirectory("libs/")
 add_subdirectory("examples/")
+add_subdirectory("MixerClient")
