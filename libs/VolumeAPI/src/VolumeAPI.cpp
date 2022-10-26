@@ -247,6 +247,9 @@ std::vector<VolumeControl::AudioSessionInfo> VolumeControl::get_all_sessions_inf
 
   session_enumerate(cb);
   ret.push_back(get_master_info());
+
+  std::sort(ret.begin(), ret.end(),
+            [](const AudioSessionInfo& l, const AudioSessionInfo& r) { return l.pid_ < r.pid_; });
   return ret;
 }
 

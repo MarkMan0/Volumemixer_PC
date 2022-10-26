@@ -44,7 +44,7 @@ public:
     return buffer_;
   }
 
-  void compute_crc();
+  uint32_t compute_crc();
 
 private:
   void append_any(const void* mem, size_t sz);

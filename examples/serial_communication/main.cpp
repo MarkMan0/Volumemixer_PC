@@ -19,12 +19,13 @@ namespace mixer {
     SET_VOLUME = 0x03,
     ECHO = 0x04,
     SET_MUTE = 0x05,
+    QUERY_CHANGES = 0x06,
     RESPONSE_OK_0 = 0xA0,
     RESPONSE_OK_1 = 0xA1,
   };
 }
 
-//#define DO_DEBUG
+#define DO_DEBUG
 #ifdef DO_DEBUG
   #define DEBUG_PRINT(ARG)  std::cout << ARG;
   #define DEBUG_WPRINT(ARG) std::wcout << ARG;
@@ -45,7 +46,11 @@ static void respond_img(SerialPortWrapper&);
 static void respond_set_volume(SerialPortWrapper&);
 static void respond_echo(SerialPortWrapper&);
 static void respond_mute(SerialPortWrapper&);
+static void respond_query_changes(SerialPortWrapper&);
 static std::vector<uint8_t> wait_data(SerialPortWrapper&, size_t);
+static uint32_t compute_session_checksum(const std::vector<VolumeControl::AudioSessionInfo>&);
+
+static uint32_t glob_last_crc = 0;
 
 int main() {
   const int port_id = 8;
@@ -100,8 +105,7 @@ static bool serial_comm(SerialPortWrapper& port) {
   }
 
   const uint8_t c = mem2T<uint8_t>(buffer.data());
-  DEBUG_PRINT("Got from serial: " << static_cast<int>(c) << '\n');
-
+  
   switch (c) {
     case -1: {
       std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -143,8 +147,15 @@ static bool serial_comm(SerialPortWrapper& port) {
       break;
     }
 
+    case mixer::commands::QUERY_CHANGES: {
+      DEBUG_PRINT("respond_query_changes()\n");
+      respond_query_changes(port);
+      DEBUG_PRINT("respond_query_changes() DONE\n");
+      break;
+    }
+
     default:
-      DEBUG_PRINT("Err: unknown\n");
+      DEBUG_PRINT("Err: unknown " << static_cast<int>(c) << "\n");
       break;
   }
 
@@ -158,8 +169,6 @@ static void respond_load(SerialPortWrapper& port) {
   Hasher sv;
   auto sessions = VC::get_all_sessions_info();
 
-  std::sort(sessions.begin(), sessions.end(),
-            [](const VC::AudioSessionInfo& l, const VC::AudioSessionInfo& r) { return l.pid_ < r.pid_; });
 
   sv.append(static_cast<uint8_t>(sessions.size()));
   sv.compute_crc();
@@ -186,8 +195,10 @@ static void respond_load(SerialPortWrapper& port) {
   auto data = wait_data(port, 2);
   if (data.size() >= 2 && data[0] == mixer::commands::RESPONSE_OK_0 && data[1] == mixer::commands::RESPONSE_OK_1) {
     DEBUG_PRINT("\tsend success\n");
+    glob_last_crc = compute_session_checksum(sessions);
   } else {
     DEBUG_PRINT("\tsend failure\n");
+    glob_last_crc = 0;
   }
 }
 
@@ -337,4 +348,29 @@ static void respond_mute(SerialPortWrapper& port) {
   const bool mute = mem2T<uint8_t>(mute_data.data() + 2);
 
   VolumeControl::set_muted(pid, mute);
+}
+
+
+
+static void respond_query_changes(SerialPortWrapper& port) {
+  bool changed = glob_last_crc != compute_session_checksum(VolumeControl::get_all_sessions_info());
+  Hasher crc;
+  DEBUG_PRINT("\tchange: " << changed << '\n');
+  crc.append(static_cast<uint8_t>(changed));
+  crc.compute_crc();
+  port.write(crc.get_buffer().data(), crc.get_buffer().size());
+}
+
+
+static uint32_t compute_session_checksum(const std::vector<VolumeControl::AudioSessionInfo>& sessions) {
+  Hasher crc;
+  for (const auto& session : sessions) {
+    crc.append(session.pid_);
+    crc.append(session.volume_);
+    crc.append(session.muted_);
+    const wchar_t* c_str = session.filename_.c_str();
+    crc.append_buff(c_str, sizeof(wchar_t) * (1 + session.filename_.size()));
+  }
+
+  return crc.compute_crc();
 }

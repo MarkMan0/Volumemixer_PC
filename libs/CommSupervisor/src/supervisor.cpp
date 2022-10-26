@@ -37,7 +37,7 @@ void Hasher::begin_message() {
 }
 
 
-void Hasher::compute_crc() {
+uint32_t Hasher::compute_crc() {
   auto start_iter = buffer_.cbegin() + last_crc_;
 
   const uint8_t* start_ptr = &(*start_iter);
@@ -47,6 +47,7 @@ void Hasher::compute_crc() {
   append(crc);
   last_crc_ += sz;
   last_crc_ += 4;
+  return crc;
 }
 
 void Hasher::append_any(const void* ptr, size_t sz) {
