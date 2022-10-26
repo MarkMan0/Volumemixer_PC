@@ -9,10 +9,6 @@
 #include <string>
 #include <codecvt>
 
-static std::string w2s(const std::wstring& other) {
-  return std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(other);
-}
-
 //#include "c:\WinDDK\7600.16385.1\inc\api\devpkey.h"
 
 // include DEVPKEY_Device_BusReportedDeviceDesc from WinDDK\7600.16385.1\inc\api\devpropdef.h
@@ -89,7 +85,7 @@ std::vector<CommPortDesc> ListDevices(CONST GUID* pClassGuid, LPCTSTR pszEnumera
                                          (BYTE*)szDesc,
                                          sizeof(szDesc),  // The size, in bytes
                                          &dwSize)) {
-      curr.dev_descr_ = w2s(szDesc);
+      curr.dev_descr_ = szDesc;
     }
 
 
@@ -102,12 +98,12 @@ std::vector<CommPortDesc> ListDevices(CONST GUID* pClassGuid, LPCTSTR pszEnumera
                                      (BYTE*)szBuffer, sizeof(szBuffer), &dwSize, 0)) {
       if (fn_SetupDiGetDevicePropertyW(hDevInfo, &DeviceInfoData, &DEVPKEY_Device_BusReportedDeviceDesc,
                                        &ulPropertyType, (BYTE*)szBuffer, sizeof(szBuffer), &dwSize, 0)) {
-        curr.bus_reported_dev_descr_ = w2s(szBuffer);
+        curr.bus_reported_dev_descr_ = szBuffer;
       }
 
       if (fn_SetupDiGetDevicePropertyW(hDevInfo, &DeviceInfoData, &DEVPKEY_Device_FriendlyName, &ulPropertyType,
                                        (BYTE*)szBuffer, sizeof(szBuffer), &dwSize, 0)) {
-        curr.friendly_name_ = w2s(szBuffer);
+        curr.friendly_name_ = szBuffer;
       }
     }
     ret.push_back(curr);
@@ -117,14 +113,14 @@ std::vector<CommPortDesc> ListDevices(CONST GUID* pClassGuid, LPCTSTR pszEnumera
 }
 
 
-static std::string frinedly_to_port_name(const std::string& f) {
+static std::wstring frinedly_to_port_name(const std::wstring& f) {
   if (f.find('(') == std::string::npos) {
     return {};
   }
 
-  std::string ret = f.substr(f.find('(') + 1);
+  std::wstring ret = f.substr(f.find('(') + 1);
   ret.pop_back();
-  ret = "\\\\.\\" + ret;
+  ret = L"\\\\.\\" + ret;
   return ret;
 }
 
