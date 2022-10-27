@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <codecvt>
+#include <array>
 
 
 static uint32_t glob_last_crc = 0;
@@ -109,8 +110,8 @@ void respond_load(SerialPortWrapper& port) {
   DEBUG_PRINT("\t data length: " << sv.get_buffer().size() << '\n');
   port.write(sv.get_buffer().data(), sv.get_buffer().size());
 
-  auto data = wait_data(port, 2);
-  if (data.size() >= 2 && data[0] == mixer::commands::RESPONSE_OK_0 && data[1] == mixer::commands::RESPONSE_OK_1) {
+  auto data = wait_data(port, 5);
+  if (data.size() >= 5 && CRC::verify_crc(data.data(), 5) && data[0] == mixer::commands::RESPONSE_OK) {
     DEBUG_PRINT("\tsend success\n");
     glob_last_crc = compute_session_checksum(sessions);
   } else {
@@ -189,8 +190,10 @@ void respond_img(SerialPortWrapper& port) {
 
     bytes_written += written;
 
-    if (wait_data(port, 1).size() < 1) {
-      DEBUG_PRINT("\tChunk timeout\n");
+    auto data = wait_data(port, 5);
+    if (data.size() >= 5 && CRC::verify_crc(data.data(), 5) && data[0] == mixer::commands::RESPONSE_OK) {
+    } else {
+      DEBUG_PRINT("\tchunk fail");
       return;
     }
   }

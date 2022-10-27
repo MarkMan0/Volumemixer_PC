@@ -20,8 +20,8 @@ namespace mixer {
     ECHO = 0x04,
     SET_MUTE = 0x05,
     QUERY_CHANGES = 0x06,
-    RESPONSE_OK_0 = 0xA0,
-    RESPONSE_OK_1 = 0xA1,
+    RESPONSE_OK = 0xA0,
+    RESPONSE_FAIL = 0xB0,
   };
 }
 
