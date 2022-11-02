@@ -34,30 +34,33 @@ using fcn_t = event_t (*)(void);
 
 std::unique_ptr<SerialPortWrapper> gPort{ nullptr };
 
-int main() {
-  static fcn_t state_table[] = { port_close_handler, port_searching_handler, port_open_handler };
-  static state_t transition_table[num_states][num_events] = { { PORT_SEARCHING, PORT_SEARCHING },
-                                                              { PORT_OPEN, PORT_SEARCHING },
-                                                              { PORT_OPEN, PORT_CLOSE } };
+static const fcn_t state_table[] = { port_close_handler, port_searching_handler, port_open_handler };
+static const state_t transition_table[num_states][num_events] = { { PORT_SEARCHING, PORT_SEARCHING },
+                                                                  { PORT_OPEN, PORT_SEARCHING },
+                                                                  { PORT_OPEN, PORT_CLOSE } };
 
+
+static state_t curr_state = state_t::PORT_SEARCHING;
+
+
+int client_init() {
   if (not VolumeControl::init()) {
     return -1;
   }
+  curr_state = state_t::PORT_SEARCHING;
+  return 0;
+}
 
-  state_t curr_state = state_t::PORT_SEARCHING;
-
-
+int client_main() {
   DEBUG_PRINT("Entering main loop\n");
-  while (1) {
-    DEBUG_PRINT("While loop...\n");
 
-    fcn_t curr_handler = state_table[curr_state];
-    if (curr_handler) {
-      event_t ev = curr_handler();
-      curr_state = transition_table[curr_state][ev];
-    } else {
-      break;
-    }
+  fcn_t curr_handler = state_table[curr_state];
+  if (curr_handler) {
+    event_t ev = curr_handler();
+    curr_state = transition_table[curr_state][ev];
+    return 0;
+  } else {
+    return -1;
   }
 }
 
