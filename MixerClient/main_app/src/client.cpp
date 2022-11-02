@@ -51,6 +51,12 @@ int client_init() {
   return 0;
 }
 
+int client_deinit() {
+  curr_state = state_t::PORT_SEARCHING;
+  gPort = nullptr;
+  return 0;
+}
+
 int client_main() {
   DEBUG_PRINT("Entering main loop\n");
 
