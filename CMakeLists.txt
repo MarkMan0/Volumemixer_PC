@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
-add_compile_definitions(UNICODE)
+add_compile_definitions("UNICODE" "_UNICODE")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options("/permissive-")
