@@ -32,12 +32,23 @@ static IAudioEndpointVolume* GetMaster() {
   IMMDevice* device = NULL;
   IAudioEndpointVolume* endpoint = NULL;
 
-  hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator),
-                        (void**)&enumerator);
+  if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator),
+                              (void**)&enumerator))) {
+    goto error;
+  }
 
-  hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
 
-  hr = device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (void**)&endpoint);
+  if (FAILED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device))) {
+    goto error;
+  }
+
+  if (FAILED(device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (void**)&endpoint))) {
+    goto error;
+  }
+
+error:
+  SAFE_RELEASE(enumerator);
+  SAFE_RELEASE(device);
 
   return endpoint;
 }
@@ -46,29 +57,28 @@ static IAudioEndpointVolume* GetMaster() {
 /// @param callback std::function object
 static void session_enumerate(std::function<bool(IAudioSessionControl*, IAudioSessionControl2*, DWORD)> callback) {
   IMMDeviceEnumerator* enumerator = NULL;
-  ISimpleAudioVolume* volume = NULL;
   IMMDevice* device = NULL;
   IAudioSessionManager2* manager = NULL;
   IAudioSessionEnumerator* sessionEnumerator = NULL;
+  int sessionCount = 0;
 
   if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
                               (void**)&enumerator))) {
-    return;
+    goto error;
   }
   if (FAILED(enumerator->GetDefaultAudioEndpoint(EDataFlow::eRender, ERole::eMultimedia, &device))) {
-    return;
+    goto error;
   }
   if (FAILED((device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, NULL, (void**)&manager)))) {
-    return;
+    goto error;
   }
   if (FAILED((manager->GetSessionEnumerator(&sessionEnumerator)))) {
-    return;
+    goto error;
   }
 
   // Get the session count
-  int sessionCount = 0;
   if (FAILED(sessionEnumerator->GetCount(&sessionCount))) {
-    return;
+    goto error;
   }
 
   // Loop through all sessions
@@ -99,6 +109,12 @@ static void session_enumerate(std::function<bool(IAudioSessionControl*, IAudioSe
       break;
     }
   }
+
+error:
+  SAFE_RELEASE(enumerator);
+  SAFE_RELEASE(device);
+  SAFE_RELEASE(manager);
+  SAFE_RELEASE(sessionEnumerator);
 }
 
 /// @brief Get volume session for @p pid
@@ -126,6 +142,7 @@ static float get_master_volume() {
   if (endpoint == NULL) return NULL;
   float level;
   endpoint->GetMasterVolumeLevelScalar(&level);
+  SAFE_RELEASE(endpoint);
   return level * 100;
 }
 
@@ -134,6 +151,7 @@ static bool get_master_mute() {
   if (endpoint == NULL) return NULL;
   BOOL mute;
   endpoint->GetMute(&mute);
+  SAFE_RELEASE(endpoint);
   return mute;
 }
 
