@@ -26,11 +26,26 @@ struct ICONDIRENTRY {
 /// @param buff output buffer
 /// @return true on success
 static bool GetIconData(HICON hIcon, int nColorBits, std::vector<uint8_t>& buff) {
+  HDC dc = 0;
+
+
+  int nBmInfoSize = sizeof(BITMAPINFOHEADER);
+  std::vector<UCHAR> bitmapInfo;
+  BITMAPINFO* pBmInfo = 0;
+  std::vector<UCHAR> bits;
+  BITMAPINFO maskInfo = { 0 };
+  std::vector<UCHAR> maskBits;
+  std::vector<UCHAR> maskInfoBytes;
+  BITMAPINFO* pMaskInfo = 0;
+  ICONDIRENTRY dir{};
+  int nBitsSize = 0;
+
+
   if (offsetof(ICONDIRENTRY, nOffset) != 12) {
     return false;
   }
 
-  HDC dc = CreateCompatibleDC(NULL);
+  dc = CreateCompatibleDC(NULL);
 
 
   // Write header:
@@ -44,49 +59,49 @@ static bool GetIconData(HICON hIcon, int nColorBits, std::vector<uint8_t>& buff)
   bmInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
   bmInfo.bmiHeader.biBitCount = 0;  // don't get the color table
   if (!GetDIBits(dc, iconInfo.hbmColor, 0, 0, NULL, &bmInfo, DIB_RGB_COLORS)) {
-    return false;
+    goto error;
   }
 
   // Allocate size of bitmap info header plus space for color table:
-  int nBmInfoSize = sizeof(BITMAPINFOHEADER);
   if (nColorBits < 24) {
     nBmInfoSize += sizeof(RGBQUAD) * (int)(1 << nColorBits);
   }
 
-  std::vector<UCHAR> bitmapInfo;
+
   bitmapInfo.resize(nBmInfoSize);
-  BITMAPINFO* pBmInfo = (BITMAPINFO*)bitmapInfo.data();
+  pBmInfo = (BITMAPINFO*)bitmapInfo.data();
   memcpy(pBmInfo, &bmInfo, sizeof(BITMAPINFOHEADER));
 
   // Get bitmap data:
-  if (!bmInfo.bmiHeader.biSizeImage) return false;
-  std::vector<UCHAR> bits;
+  if (!bmInfo.bmiHeader.biSizeImage) {
+    goto error;
+  }
+
   bits.resize(bmInfo.bmiHeader.biSizeImage);
   pBmInfo->bmiHeader.biBitCount = nColorBits;
   pBmInfo->bmiHeader.biCompression = BI_RGB;
   if (!GetDIBits(dc, iconInfo.hbmColor, 0, bmInfo.bmiHeader.biHeight, bits.data(), pBmInfo, DIB_RGB_COLORS)) {
-    return false;
+    goto error;
   }
 
   // Get mask data:
-  BITMAPINFO maskInfo = { 0 };
   maskInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
   maskInfo.bmiHeader.biBitCount = 0;  // don't get the color table
-  if (!GetDIBits(dc, iconInfo.hbmMask, 0, 0, NULL, &maskInfo, DIB_RGB_COLORS) || maskInfo.bmiHeader.biBitCount != 1)
-    return false;
+  if (!GetDIBits(dc, iconInfo.hbmMask, 0, 0, NULL, &maskInfo, DIB_RGB_COLORS) || maskInfo.bmiHeader.biBitCount != 1) {
+    goto error;
+  }
 
-  std::vector<UCHAR> maskBits;
+
   maskBits.resize(maskInfo.bmiHeader.biSizeImage);
-  std::vector<UCHAR> maskInfoBytes;
   maskInfoBytes.resize(sizeof(BITMAPINFO) + 2 * sizeof(RGBQUAD));
-  BITMAPINFO* pMaskInfo = (BITMAPINFO*)maskInfoBytes.data();
+  pMaskInfo = (BITMAPINFO*)maskInfoBytes.data();
   memcpy(pMaskInfo, &maskInfo, sizeof(maskInfo));
   if (!GetDIBits(dc, iconInfo.hbmMask, 0, maskInfo.bmiHeader.biHeight, maskBits.data(), pMaskInfo, DIB_RGB_COLORS)) {
-    return false;
+    goto error;
   }
 
   // Write directory entry:
-  ICONDIRENTRY dir;
+
   dir.nWidth = (UCHAR)pBmInfo->bmiHeader.biWidth;
   dir.nHeight = (UCHAR)pBmInfo->bmiHeader.biHeight;
   dir.nNumColorsInPalette = (nColorBits == 4 ? 16 : 0);
@@ -99,7 +114,7 @@ static bool GetIconData(HICON hIcon, int nColorBits, std::vector<uint8_t>& buff)
   buff.insert(buff.end(), reinterpret_cast<const uint8_t*>(&dir), reinterpret_cast<const uint8_t*>(&dir) + sizeof(dir));
 
   // Write DIB header (including color table):
-  int nBitsSize = pBmInfo->bmiHeader.biSizeImage;
+  nBitsSize = pBmInfo->bmiHeader.biSizeImage;
   pBmInfo->bmiHeader.biHeight *= 2;  // because the header is for both image and mask
   pBmInfo->bmiHeader.biCompression = 0;
   pBmInfo->bmiHeader.biSizeImage += pMaskInfo->bmiHeader.biSizeImage;  // because the header is for both image and mask
@@ -120,8 +135,10 @@ static bool GetIconData(HICON hIcon, int nColorBits, std::vector<uint8_t>& buff)
   DeleteObject(iconInfo.hbmMask);
 
   DeleteDC(dc);
-
   return true;
+error:
+  DeleteDC(dc);
+  return false;
 }
 
 
