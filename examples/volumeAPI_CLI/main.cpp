@@ -52,6 +52,16 @@ int main() {
         }
       } break;
 
+      case 'l':
+        if (selected) {
+          for (const auto& i : info) {
+            if (i.pid_ == *selected) {
+              std::cout << "IMG len: " << i.get_icon_data().size() << '\n';
+              break;
+            }
+          }
+        }
+
       case '+':
         if (selected) {
           int vol = VolumeControl::get_volume(*selected);
