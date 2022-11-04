@@ -40,7 +40,8 @@ A `.clang_format` file is included with the project, along with a `.pre-commit-c
 ## TODO
 These only concern this application, not the whole project.
 
-1. Register for device notification, to detect when a usb is inserted/removed, and not check periodically
-1. Register for notification on volume change, and don't query each time
-1. make this a windows service, so it will be able to run in the background
-1. do the .ico to .png conversion inside the program, and don't call magick.
+- [ ] Register for device notification, to detect when a usb is inserted/removed, and not check periodically
+- [ ] Register for notification on volume change, and don't query each time
+- [x] make this a windows service, so it will be able to run in the background - service is not working, because it runs under different user, and can't access the session info
+- [x] window-less application - this "replaces" the service, so it can be run in the background
+- [ ] do the .ico to .png conversion inside the program, and don't call magick.
