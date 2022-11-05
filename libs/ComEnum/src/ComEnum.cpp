@@ -108,7 +108,7 @@ std::vector<CommPortDesc> ListDevices(CONST GUID* pClassGuid, LPCTSTR pszEnumera
     }
     ret.push_back(curr);
   }
-
+  SetupDiDestroyDeviceInfoList(hDevInfo);
   return ret;
 }
 
