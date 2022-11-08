@@ -248,7 +248,7 @@ void respond_set_volume(SerialPortWrapper& port) {
 
 void respond_echo(SerialPortWrapper& port) {
   uint8_t c = '\0';
-  while (port.read(&c, 1)) {
+  while (port.read(&c, 1) && c != '\0') {
     std::cout << static_cast<char>(c);
   }
 }
